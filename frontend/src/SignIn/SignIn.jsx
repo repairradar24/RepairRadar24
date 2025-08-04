@@ -1,9 +1,16 @@
 import './signin.css';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import api from '../axiosConfig.js';
 
 const SignIn = () => {
+    useEffect(() => {
+        api.get('/api/test').then(resp => {
+            console.log(resp.data);
+        })
+    },[]);
+
     return (
         <div className="signin-container">
             <h2>Sign In</h2>
