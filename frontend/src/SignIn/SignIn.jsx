@@ -1,32 +1,141 @@
 import './signin.css';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import api from '../axiosConfig.js';
+import "bootstrap/dist/css/bootstrap.min.css";
 
-const SignIn = () => {
+export default function SignIn() {
+    const navigate = useNavigate();
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [signInData, setSignInData] = useState({ email: "", password: "" });
+    const [signUpData, setSignUpData] = useState({ name: "", email: "", password: "" });
+    const [error, setError] = useState("");
+
     useEffect(() => {
-        api.get('/api/test').then(resp => {
-            console.log(resp.data);
-        })
-    },[]);
+        const token = localStorage.getItem("token");
+        if (token) navigate("/dashboard");
+    }, [navigate]);
+
+    const handleSignInChange = (e) => {
+        setSignInData({ ...signInData, [e.target.name]: e.target.value });
+    };
+
+    const handleSignUpChange = (e) => {
+        setSignUpData({ ...signUpData, [e.target.name]: e.target.value });
+    };
+
+    const handleSignInSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        try {
+            const res = await api.post("/auth/login", signInData);
+            localStorage.setItem("token", res.data.token);
+            navigate("/dashboard");
+        } catch (err) {
+            setError(err.response?.data?.message || "Sign in failed.");
+        }
+    };
+
+    const handleSignUpSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        try {
+            await api.post("/auth/signup", signUpData);
+            setIsSignUp(false);
+        } catch (err) {
+            setError(err.response?.data?.message || "Sign up failed.");
+        }
+    };
 
     return (
-        <div className="signin-container">
-            <h2>Sign In</h2>
-            <form>
-                <div className="form-group">
-                    <label htmlFor="email">Email:</label>
-                    <input type="email" id="email" name="email" required />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="password">Password:</label>
-                    <input type="password" id="password" name="password" required />
-                </div>
-                <button type="submit">Sign In</button>
-            </form>
+        <div className="signin-page">
+            <div className="signin-card shadow">
+                <h1 className="site-title">RepairRadar</h1>
+                <h3 className="text-center mb-4">{isSignUp ? "Create Account" : "Sign In"}</h3>
+
+                {error && <div className="alert alert-danger">{error}</div>}
+
+                {isSignUp ? (
+                    <form onSubmit={handleSignUpSubmit}>
+                        <div className="mb-3">
+                            <label className="form-label">Name</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                name="name"
+                                value={signUpData.name}
+                                onChange={handleSignUpChange}
+                                required
+                            />
+                        </div>
+                        <div className="mb-3">
+                            <label className="form-label">Email</label>
+                            <input
+                                type="email"
+                                className="form-control"
+                                name="email"
+                                value={signUpData.email}
+                                onChange={handleSignUpChange}
+                                required
+                            />
+                        </div>
+                        <div className="mb-3">
+                            <label className="form-label">Password</label>
+                            <input
+                                type="password"
+                                className="form-control"
+                                name="password"
+                                value={signUpData.password}
+                                onChange={handleSignUpChange}
+                                required
+                            />
+                        </div>
+                        <button type="submit" className="btn btn-gradient w-100">
+                            Sign Up
+                        </button>
+                        <p className="text-center mt-3">
+                            Already have an account?{" "}
+                            <button type="button" className="btn btn-link p-0" onClick={() => setIsSignUp(false)}>
+                                Sign In
+                            </button>
+                        </p>
+                    </form>
+                ) : (
+                    <form onSubmit={handleSignInSubmit}>
+                        <div className="mb-3">
+                            <label className="form-label">Email</label>
+                            <input
+                                type="email"
+                                className="form-control"
+                                name="email"
+                                value={signInData.email}
+                                onChange={handleSignInChange}
+                                required
+                            />
+                        </div>
+                        <div className="mb-3">
+                            <label className="form-label">Password</label>
+                            <input
+                                type="password"
+                                className="form-control"
+                                name="password"
+                                value={signInData.password}
+                                onChange={handleSignInChange}
+                                required
+                            />
+                        </div>
+                        <button type="submit" className="btn btn-gradient w-100">
+                            Sign In
+                        </button>
+                        <p className="text-center mt-3">
+                            Don’t have an account?{" "}
+                            <button type="button" className="btn btn-link p-0" onClick={() => setIsSignUp(true)}>
+                                Create New Account
+                            </button>
+                        </p>
+                    </form>
+                )}
+            </div>
         </div>
     );
 }
-
-export default SignIn;

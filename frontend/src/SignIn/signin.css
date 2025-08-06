@@ -1,0 +1,50 @@
+/* Full page center alignment */
+.signin-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  background: linear-gradient(135deg, #d4f0f0, #f6d6d6); /* Light pastel gradient */
+  padding: 20px;
+}
+
+/* Card styling */
+.signin-card {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+/* Site title styling */
+.site-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 2rem;
+  color: #6b5b95; /* Soft purple */
+  margin-bottom: 20px;
+}
+
+/* Pastel gradient button */
+.btn-gradient {
+  background: linear-gradient(45deg, #a8e6cf, #dcedc1); /* Mint + light green */
+  color: #333;
+  border: none;
+  font-weight: bold;
+  transition: 0.3s ease;
+}
+
+.btn-gradient:hover {
+  background: linear-gradient(45deg, #9ed9c2, #cbe3b2);
+  color: #222;
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+  .signin-card {
+    padding: 20px;
+  }
+}
