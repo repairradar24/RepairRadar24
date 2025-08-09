@@ -31,6 +31,10 @@ export default function SignIn() {
         setError("");
         try {
             await api.post("/api/signin", signInData).then((resp) => {
+                if (resp.status === 204) {
+                    alert("Account not approved by owner. Contact 9601613653");
+                    return;
+                }
                 if (resp.status === 200) { 
                     alert("Welcome "+resp.data.user.name);
                     localStorage.setItem("token", resp.data.token);
