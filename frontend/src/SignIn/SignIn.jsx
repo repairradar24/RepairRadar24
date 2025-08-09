@@ -7,7 +7,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 export default function SignIn() {
     const navigate = useNavigate();
     const [isSignUp, setIsSignUp] = useState(false);
-    const [signInData, setSignInData] = useState({ email: "", password: "" });
+    const [signInData, setSignInData] = useState({ email: "hetvik1@gmail.com", password: "hetvik123" });
     const [signUpData, setSignUpData] = useState({ name: "", email: "", password: "" });
     const [error, setError] = useState("");
 
@@ -38,7 +38,7 @@ export default function SignIn() {
                 if (resp.status === 200) { 
                     alert("Welcome "+resp.data.user.name);
                     localStorage.setItem("token", resp.data.token);
-                    navigate("https://google.com");
+                    navigate("/dashboard");
                 }
             }); 
         } catch (err) {

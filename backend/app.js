@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { connectMainDb, getMainDb } = require('./config/mainDb');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,6 +17,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/api', authRoutes); // ✅ Mount the signup route
+app.use('/user',userRoutes);
 
 // Sample API route
 app.get('/api/test', (req, res) => {

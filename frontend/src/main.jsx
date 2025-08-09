@@ -5,12 +5,14 @@ import './index.css';
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import SignIn from './SignIn/SignIn.jsx';
+import Dashboard from './Dashboard/Dashboard.jsx';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Router>
       <Routes>
         <Route path="/" element={<SignIn />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </Router>
   </React.StrictMode>,

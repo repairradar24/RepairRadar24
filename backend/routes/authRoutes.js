@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { getMainDb } = require('../config/mainDb');
+const { connectUserDb } = require('../config/userDb');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = 'repairradar_secret_key'; // Replace with secure key or use .env in production
@@ -66,6 +67,7 @@ router.post('/signin', async (req, res) => {
       return;
     }
 
+    
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -75,6 +77,8 @@ router.post('/signin', async (req, res) => {
       JWT_SECRET,
       { expiresIn: '6h' } // Token valid for 6 hours
     );
+
+    connectUserDb(user.dbUrl, user.name, token)
 
     res.status(200).json({
       message: 'Signin successful',
