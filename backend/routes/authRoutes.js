@@ -29,7 +29,8 @@ router.post('/signup', async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      validity: new Date().plus(15 * 24 * 60 * 60 * 1000)
+      validity: new Date().plus(15 * 24 * 60 * 60 * 1000), // 15 days free validity in milliseconds
+      dbUrl: ""
     });
 
     res.status(201).json({
