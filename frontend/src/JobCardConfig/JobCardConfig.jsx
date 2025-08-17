@@ -1,16 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../axiosConfig";
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import "./jobcardconfig.css";
 
-const FieldConfig = ({ fields, setFields }) => {
+const generateKey = (name) => {
+  return name.trim().toLowerCase().replace(/\s+/g, "_");
+};
+
+const FieldConfig = ({ fields, setFields, level = 0 }) => {
   const addField = () => {
-    setFields([...fields, { name: "", type: "text", options: [], fields: [] }]);
+    setFields([
+      ...fields,
+      { name: "", key: "", type: "text", options: [], fields: [] }
+    ]);
   };
 
   const updateField = (index, key, value) => {
     const updated = [...fields];
     updated[index][key] = value;
+
+    if (key === "name") {
+      updated[index].key = generateKey(value);
+    }
+
     if (key === "type" && value !== "dropdown" && value !== "list") {
       updated[index].options = [];
     }
@@ -37,34 +49,53 @@ const FieldConfig = ({ fields, setFields }) => {
   };
 
   return (
-    <div style={{ marginLeft: "20px", borderLeft: "2px solid #ddd", paddingLeft: "10px" }}>
+    <div className={`field-group level-${level}`}>
       {fields.map((field, index) => (
-        <div key={index} style={{ marginBottom: "15px" }}>
-          <input
-            type="text"
-            placeholder="Field Name"
-            value={field.name}
-            onChange={(e) => updateField(index, "name", e.target.value)}
-          />
-          <select
-            value={field.type}
-            onChange={(e) => updateField(index, "type", e.target.value)}
-          >
-            <option value="text">Text</option>
-            <option value="number">Number</option>
-            <option value="dropdown">Dropdown</option>
-            <option value="date">Date</option>
-            <option value="checkbox">Checkbox</option>
-            <option value="list">List</option>
-          </select>
+        <div key={index} className="field-item">
+          <div className="field-row">
+            <input
+              type="text"
+              className="field-input"
+              placeholder="Field Name"
+              value={field.name}
+              onChange={(e) => updateField(index, "name", e.target.value)}
+            />
+            <select
+              className="field-select"
+              value={field.type}
+              onChange={(e) => updateField(index, "type", e.target.value)}
+            >
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="dropdown">Dropdown</option>
+              <option value="date">Date</option>
+              <option value="checkbox">True/False</option>
+              <option value="list">List</option>
+            </select>
+            <span className="field-key">({field.key})</span>
+            <button
+              type="button"
+              className="remove-btn"
+              onClick={() => removeField(index)}
+            >
+              Remove
+            </button>
+          </div>
 
           {field.type === "dropdown" && (
-            <div>
-              <button type="button" onClick={() => addOption(index)}>Add Option</button>
+            <div className="options-section">
+              <button
+                type="button"
+                className="add-option-btn"
+                onClick={() => addOption(index)}
+              >
+                + Add Option
+              </button>
               {field.options.map((opt, optIndex) => (
                 <input
                   key={optIndex}
                   type="text"
+                  className="option-input"
                   placeholder={`Option ${optIndex + 1}`}
                   value={opt}
                   onChange={(e) => updateOption(index, optIndex, e.target.value)}
@@ -74,8 +105,8 @@ const FieldConfig = ({ fields, setFields }) => {
           )}
 
           {field.type === "list" && (
-            <div>
-              <h5>Subfields for "{field.name}"</h5>
+            <div className="subfields-section">
+              <h5 className="subfields-title">Subfields for "{field.name}"</h5>
               <FieldConfig
                 fields={field.fields}
                 setFields={(newSubfields) => {
@@ -83,14 +114,15 @@ const FieldConfig = ({ fields, setFields }) => {
                   updated[index].fields = newSubfields;
                   setFields(updated);
                 }}
+                level={level + 1}
               />
             </div>
           )}
-
-          <button type="button" onClick={() => removeField(index)}>Remove</button>
         </div>
       ))}
-      <button type="button" onClick={addField}>Add Field</button>
+      <button type="button" className="add-field-btn" onClick={addField}>
+        + Add Field
+      </button>
     </div>
   );
 };
@@ -100,7 +132,7 @@ export default function JobCardConfigRecursive() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = sessionStorage.getItem('token');
+    const token = sessionStorage.getItem("token");
     if (!token) {
       alert("You need to be logged in to access this page.");
       navigate("/");
@@ -108,37 +140,39 @@ export default function JobCardConfigRecursive() {
   }, []);
 
   const saveConfig = async () => {
-    console.log("Saving configuration:", fields);
-    const token = sessionStorage.getItem('token');
-    console.log("Token:", token);
-    await api.post("/user/save-config",
-      { schema: fields },
-      { headers: { 'authorization': `Bearer ${token}` } },
-    ).then((resp) => {
-      if (resp.status === 200) {
-        alert(resp.data.message);
-        navigate("/dashboard");
-      }
-    }).catch((err) => {
-      if (err.status === 401) {
-        alert("Unauthorized. Please log in again.");
-        navigate("/");
-        return;
-      }
-      else{
-        console.error("Error saving configuration:", err);
-        alert("Failed to save configuration. Please try again.");
-      }
-    })
-
+    const token = sessionStorage.getItem("token");
+    await api
+      .post(
+        "/user/save-config",
+        { schema: fields },
+        { headers: { authorization: `Bearer ${token}` } }
+      )
+      .then((resp) => {
+        if (resp.status === 200) {
+          alert(resp.data.message);
+          navigate("/dashboard");
+        }
+      })
+      .catch((err) => {
+        if (err.status === 401) {
+          alert("Unauthorized. Please log in again.");
+          navigate("/");
+          return;
+        } else {
+          console.error("Error saving configuration:", err);
+          alert("Failed to save configuration. Please try again.");
+        }
+      });
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Configure Job Card</h2>
+    <div className="jobcard-container">
+      <h2 className="title">Configure Job Card</h2>
       <FieldConfig fields={fields} setFields={setFields} />
       <br />
-      <button onClick={saveConfig}>Save Configuration</button>
+      <button onClick={saveConfig} className="save-btn">
+        Save Configuration
+      </button>
     </div>
   );
 }
