@@ -28,10 +28,6 @@ async function connectUserDb(dbUrl, jwtToken) {
 function getUserDb(jwtToken) {
   // console.log("Getting user DB for token:", jwtToken);
   // console.log("Current connections:", userDbConnections);
-  if (!userDbConnections.has(jwtToken)) {
-    console.log("Connection timeout");
-    return res.status(401).json({ error: 'Connection timed out' });
-  }
   return userDbConnections.get(jwtToken);
 }
 

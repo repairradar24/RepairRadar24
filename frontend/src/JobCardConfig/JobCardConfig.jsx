@@ -120,8 +120,15 @@ export default function JobCardConfigRecursive() {
         navigate("/dashboard");
       }
     }).catch((err) => {
-      console.error("Error saving configuration:", err);
-      alert("Failed to save configuration. Please try again.");
+      if (err.status === 401) {
+        alert("Unauthorized. Please log in again.");
+        navigate("/");
+        return;
+      }
+      else{
+        console.error("Error saving configuration:", err);
+        alert("Failed to save configuration. Please try again.");
+      }
     })
 
   };

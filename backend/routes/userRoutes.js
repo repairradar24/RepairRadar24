@@ -27,9 +27,13 @@ router.post("/save-config",authenticateAndGetUserDb, async (req, res) => {
   const { schema } = req.body;
   const userId = req.user.userId; // from auth middleware
 
-  const mainDbConnection = getMainDb();
+  const mainDbConnection = await getMainDb();
 
-  const userDbConnection = getUserDb(req.token);
+  const userDbConnection = await getUserDb(req.token);
+  if (!userDbConnection) {
+    console.log("User not found in cached backend map");
+    return res.status(401).json({ error: 'Connection timed out' });
+  }
 
   // Save schema to user DB
   await userDbConnection.collection("settings").updateOne(
