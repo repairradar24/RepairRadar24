@@ -15,7 +15,7 @@ router.post('/signup', async (req, res) => {
     if (!name || !email || !password)
       return res.status(400).json({ error: 'All fields are required.' });
 
-    const db = getMainDb();
+    const db = await getMainDb();
 
     // Check if email already exists
     const existingUser = await db.collection('users').findOne({ email });
