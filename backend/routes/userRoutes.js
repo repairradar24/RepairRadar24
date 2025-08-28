@@ -70,28 +70,36 @@ router.get("/get-config", authenticateAndGetUserDb, async (req, res) => {
   res.status(200).json(config);
 });
 
-// routes/user.js
-router.get("/jobs", authenticateAndGetUserDb, async (req, res) => {
+router.get("/jobs/count", authenticateAndGetUserDb, async (req, res) => {
   try {
-    const { page = 1, limit = 6 } = req.query;
-    const db = req.userDb; // ✅ your middleware attaches correct tenant DB
+    const userDb = await getUserDb(req.user.userId);
+    const total = await userDb.collection("jobs").countDocuments({});
+    res.json({ total });
+  } catch (err) {
+    console.error("Error getting job count:", err);
+    res.status(500).json({ error: "Failed to get job count" });
+  }
+});
 
-    const jobs = await db
+router.get("/jobs/list", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDb = await getUserDb(req.user.userId);
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const jobs = await userDb
       .collection("jobs")
       .find({})
-      .skip((page - 1) * parseInt(limit))
-      .limit(parseInt(limit))
+      .skip(skip)
+      .limit(limit)
       .toArray();
 
-    const total = await db.collection("jobs").countDocuments();
-
-    res.json({
-      jobs,
-      hasMore: page * limit < total,
-    });
+    res.json({ jobs });
   } catch (err) {
-    console.error("Error fetching jobs:", err);
-    res.status(500).json({ message: "Failed to fetch jobs" });
+    console.error("Error getting jobs list:", err);
+    res.status(500).json({ error: "Failed to get jobs list" });
   }
 });
 
