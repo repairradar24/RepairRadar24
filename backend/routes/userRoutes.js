@@ -72,9 +72,10 @@ router.get("/get-config", authenticateAndGetUserDb, async (req, res) => {
 
 router.get("/jobs/count", authenticateAndGetUserDb, async (req, res) => {
   try {
-    const userDb = await getUserDb(req.user.userId);
+    const userDb = await getUserDb(req.token);
     const total = await userDb.collection("jobs").countDocuments({});
-    res.json({ total });
+    console.log("Total jobs count:", total);
+    return res.status(200).json({ total });
   } catch (err) {
     console.error("Error getting job count:", err);
     res.status(500).json({ error: "Failed to get job count" });

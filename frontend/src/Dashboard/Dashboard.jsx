@@ -26,41 +26,41 @@ export default function Dashboard() {
     }
 
     // Fetch user profile
-    //   api
-    //     .get("/user/profile", {
-    //       headers: { authorization: `Bearer ${token}` },
-    //     })
-    //     .then((res) => {
-    //       if (res.data && res.data.name) setName(res.data.name);
-    //     })
-    //     .catch(() => navigate("/"));
+      api
+        .get("user/jobs/count", {
+          headers: { authorization: `Bearer ${token}` },
+        })
+        .then((res) => {
+          if (res.data)
+            alert(`You have ${res.data.total} jobs in total.`);
+        })
+        .catch(() => navigate("/"));
 
-    //   // First page jobs
-    //   fetchJobs(1);
-    // }, [navigate]);
-  })
+      // First page jobs
+      fetchJobs(1);
+    }, [navigate]);
 
   const fetchJobs = async (pageNum) => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/user/jobs?page=${pageNum}&limit=6`, {
-        headers: { authorization: `Bearer ${token}` },
-      });
+    // setLoading(true);
+    // try {
+    //   const res = await api.get(`/user/jobs?page=${pageNum}&limit=6`, {
+    //     headers: { authorization: `Bearer ${token}` },
+    //   });
 
-      if (res.data && res.data.jobs) {
-        if (pageNum === 1) {
-          setJobs(res.data.jobs);
-        } else {
-          setJobs((prev) => [...prev, ...res.data.jobs]);
-        }
-        setHasMore(res.data.hasMore);
-        setPage(pageNum);
-      }
-    } catch (err) {
-      console.error("Error fetching jobs:", err);
-    } finally {
-      setLoading(false);
-    }
+    //   if (res.data && res.data.jobs) {
+    //     if (pageNum === 1) {
+    //       setJobs(res.data.jobs);
+    //     } else {
+    //       setJobs((prev) => [...prev, ...res.data.jobs]);
+    //     }
+    //     setHasMore(res.data.hasMore);
+    //     setPage(pageNum);
+    //   }
+    // } catch (err) {
+    //   console.error("Error fetching jobs:", err);
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const handleLogout = () => {
