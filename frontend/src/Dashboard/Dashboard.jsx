@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../axiosConfig";
+import { Button } from "@mui/material";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import "./dashboard.css"; // ✅ import CSS file
 
 export default function Dashboard() {
@@ -88,6 +90,15 @@ export default function Dashboard() {
         <h2>
           Welcome, <span className="highlight">{name || "User"}</span> 👋
         </h2>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddCircleOutlineIcon />}
+          className="create-job-btn"
+          onClick={() => navigate("/create-job")}
+        >
+          Create Job Card
+        </Button>
       </div>
 
       {/* Job Cards */}

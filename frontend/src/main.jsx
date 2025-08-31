@@ -7,6 +7,7 @@ import './index.css'
 import SignIn from './SignIn/SignIn.jsx';
 import Dashboard from './Dashboard/Dashboard.jsx';
 import JobCardConfig from './JobCardConfig/JobCardConfig.jsx';
+import CreateJobCard from './CreateJobCard/CreateJobCard.jsx';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')).render(
         <Route path="/" element={<SignIn />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/config" element={<JobCardConfig />} />
+        <Route path="/create-job" element={<CreateJobCard />} />
       </Routes>
     </Router>
   </React.StrictMode>,

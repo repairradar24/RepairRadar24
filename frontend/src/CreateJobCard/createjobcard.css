@@ -1,0 +1,84 @@
+.create-job-container {
+  min-width: 95vw;
+  margin: 40px auto;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0px 4px 20px rgba(0,0,0,0.1);
+}
+
+.title {
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  color: #2c3e50;
+}
+
+.field-row {
+  margin-bottom: 20px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  background: #f9fafc;
+}
+
+.list-section {
+  margin-top: 15px;
+}
+
+.list-table {
+  margin-top: 10px;
+  overflow-x: auto;
+  border-radius: 12px;
+}
+
+.add-row-btn {
+  margin-top: 10px !important;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.save-btn {
+  display: block !important;
+  margin: 30px auto 0 auto !important;
+  padding: 12px 30px !important;
+  font-size: 1.1rem !important;
+  border-radius: 12px !important;
+}
+
+.loading {
+  text-align: center;
+  font-size: 1.2rem;
+  margin-top: 50px;
+}
+
+.fields-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.field-item {
+  flex: 1 1 calc(25% - 16px); /* 4 fields per row */
+  min-width: 220px;            /* Prevents shrinking too small */
+  box-sizing: border-box;
+}
+
+.list-wrapper {
+  flex: 1 1 100%;
+  margin-top: 20px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
