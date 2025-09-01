@@ -104,5 +104,34 @@ router.get("/jobs/list", authenticateAndGetUserDb, async (req, res) => {
   }
 });
 
+router.post("/jobs/savejobcard", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDb = await getUserDb(req.token); // connect to the user's DB
+    const jobsCollection = userDb.collection("jobs");
+
+    const newJob = req.body;
+
+    const lastJob = await jobsCollection.findOne(
+      {},
+      { sort: { jobNo: -1 } }
+    );
+    const nextJobNo = lastJob ? lastJob.jobNo + 1 : 1;
+
+    newJob.jobNo = nextJobNo;
+    newJob.createdAt = new Date();
+
+    await jobsCollection.insertOne(newJob);
+
+    res.json({
+      success: true,
+      message: "Job saved successfully",
+      jobNo: nextJobNo,
+    });
+  } catch (err) {
+    console.error("Error saving job:", err);
+    res.status(500).json({ success: false, message: "Failed to save job" });
+  }
+});
+
 
 module.exports = router;

@@ -60,6 +60,7 @@ export default function CreateJobCard() {
     setFormData((prev) => ({ ...prev, [listKey]: updatedList }));
   };
 
+  // Add rows in list-type fields
   const addListRow = (listKey, fields) => {
     const currentList = formData[listKey] || [];
     const newRow = {};
@@ -69,36 +70,31 @@ export default function CreateJobCard() {
     setFormData((prev) => ({ ...prev, [listKey]: [...currentList, newRow] }));
   };
 
+  // Remove rows in list-type fields
   const removeListRow = (listKey, rowIndex) => {
     const currentList = formData[listKey] || [];
     const updated = currentList.filter((_, i) => i !== rowIndex);
     setFormData((prev) => ({ ...prev, [listKey]: updated }));
   };
 
-  // ✅ Submit form → create job
+  // ✅ Save job to database
   const handleSave = async () => {
-    const token = sessionStorage.getItem("token");
-    try {
-      // get max job number
-      const res = await api.get("/user/jobs/maxJobNo", {
-        headers: { authorization: `Bearer ${token}` },
-      });
+  const token = sessionStorage.getItem("token");
+  try {
+    const payload = { ...formData };
 
-      const newJobNo = (res.data.maxJobNo || 0) + 1;
+    await api.post("/user/jobs/savejobcard", payload, {
+      headers: { authorization: `Bearer ${token}` },
+    });
 
-      const payload = { ...formData, jobNo: newJobNo };
+    alert("Job created successfully!");
+    navigate("/dashboard");
+  } catch (err) {
+    console.error("Job save failed:", err);
+    alert("Could not save job.");
+  }
+};
 
-      await api.post("/user/jobs", payload, {
-        headers: { authorization: `Bearer ${token}` },
-      });
-
-      alert("Job created successfully!");
-      navigate("/jobs");
-    } catch (err) {
-      console.error("Job save failed:", err);
-      alert("Could not save job.");
-    }
-  };
 
   if (loading) return <div className="loading">Loading...</div>;
 
@@ -112,7 +108,7 @@ export default function CreateJobCard() {
             // Lists span full width
             return (
               <div key={field.key} className="list-wrapper">
-                {/* List rendering logic (unchanged) */}
+                {/* List rendering logic */}
                 <div className="list-section">
                   <h4>{field.name}</h4>
                   <Paper className="list-table">
@@ -130,13 +126,53 @@ export default function CreateJobCard() {
                           <TableRow key={rowIndex}>
                             {field.fields.map((sub) => (
                               <TableCell key={sub.key}>
-                                <TextField
-                                  value={row[sub.key] || ""}
-                                  onChange={(e) =>
-                                    handleListChange(field.key, rowIndex, sub.key, e.target.value)
-                                  }
-                                  size="small"
-                                />
+                                {/* Text & Number */}
+                                {(sub.type === "text" || sub.type === "number" || sub.type === "date") && (
+                                  <TextField
+                                    type={sub.type === "number" ? "number" : sub.type}
+                                    value={row[sub.key] || ""}
+                                    onChange={(e) =>
+                                      handleListChange(field.key, rowIndex, sub.key, e.target.value)
+                                    }
+                                    size="small"
+                                    fullWidth
+                                  />
+                                )}
+
+                                {/* Dropdown */}
+                                {sub.type === "dropdown" && (
+                                  <Autocomplete
+                                    options={sub.options || []}
+                                    value={
+                                      row[sub.key]
+                                        ? sub.options.find((opt) => opt.value === row[sub.key]) || null
+                                        : (sub.options && sub.options.length > 0 ? sub.options[0] : null)
+                                    }
+                                    getOptionLabel={(option) => option.value || ""}
+                                    isOptionEqualToValue={(option, value) => option.value === value.value}
+                                    onChange={(_, newValue) =>
+                                      handleListChange(
+                                        field.key,
+                                        rowIndex,
+                                        sub.key,
+                                        newValue ? newValue.value : (sub.options[0]?.value || "")
+                                      )
+                                    }
+                                    renderInput={(params) => (
+                                      <TextField {...params} size="small" fullWidth />
+                                    )}
+                                  />
+                                )}
+
+                                {/* Boolean → Switch */}
+                                {sub.type === "checkbox" && (
+                                  <Switch
+                                    checked={!!row[sub.key]}
+                                    onChange={(e) =>
+                                      handleListChange(field.key, rowIndex, sub.key, e.target.checked)
+                                    }
+                                  />
+                                )}
                               </TableCell>
                             ))}
                             <TableCell>
@@ -184,12 +220,14 @@ export default function CreateJobCard() {
                 <Autocomplete
                   options={field.options || []}
                   value={
-                    field.options.find((opt) => opt.value === formData[field.key]) || null
+                    formData[field.key]
+                      ? field.options.find((opt) => opt.value === formData[field.key]) || null
+                      : (field.options && field.options.length > 0 ? field.options[0] : null)
                   }
                   getOptionLabel={(option) => option.value || ""}
                   isOptionEqualToValue={(option, value) => option.value === value.value}
                   onChange={(_, newValue) =>
-                    handleChange(field.key, newValue ? newValue.value : "")
+                    handleChange(field.key, newValue ? newValue.value : (field.options[0]?.value || ""))
                   }
                   renderInput={(params) => (
                     <TextField {...params} label={field.name} margin="normal" fullWidth />
