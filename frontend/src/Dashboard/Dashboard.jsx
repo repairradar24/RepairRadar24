@@ -8,61 +8,70 @@ import "./dashboard.css"; // ✅ import CSS file
 export default function Dashboard() {
   const [name, setName] = useState("");
   const [jobs, setJobs] = useState([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0); // page starts at 0
+  const [totalJobs, setTotalJobs] = useState(0);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [hasMore, setHasMore] = useState(true);
 
+  const navigate = useNavigate();
   const token = sessionStorage.getItem("token");
   const userName = sessionStorage.getItem("userName");
 
-  // ✅ Fetch user + jobs
+  // ✅ Initial load → check auth + fetch count + fetch first jobs
   useEffect(() => {
     if (!token) {
       alert("You are not logged in. Please sign in.");
       navigate("/");
       return;
     }
-    if (userName) {
-      setName(userName.toUpperCase());
-    }
 
-    // Fetch user profile
+    if (userName) setName(userName.toUpperCase());
+
+    // 1️⃣ Fetch job count
     api
-      .get("user/jobs/count", {
+      .get("/user/jobs/count", {
         headers: { authorization: `Bearer ${token}` },
       })
       .then((res) => {
-        if (res.data)
-          alert(`You have ${res.data.total} jobs in total.`);
+        if (res.data && res.data.total) {
+          setTotalJobs(res.data.total);
+          if (res.data.total > 0) {
+            fetchJobs(0); // fetch first batch
+          }
+        }
       })
-      .catch(() => navigate("/"));
+      .catch((err) => {
+        console.error("Error fetching job count:", err);
+        navigate("/");
+      });
+  }, [navigate, token, userName]);
 
-    // First page jobs
-    fetchJobs(1);
-  }, [navigate]);
-
+  // 2️⃣ Fetch paginated jobs (20 at a time)
   const fetchJobs = async (pageNum) => {
-    // setLoading(true);
-    // try {
-    //   const res = await api.get(`/user/jobs?page=${pageNum}&limit=6`, {
-    //     headers: { authorization: `Bearer ${token}` },
-    //   });
+    setLoading(true);
+    try {
+      const res = await api.get(
+        `/user/jobs/getjobcards?offset=${pageNum * 20}&limit=20`,
+        { headers: { authorization: `Bearer ${token}` } }
+      );
 
-    //   if (res.data && res.data.jobs) {
-    //     if (pageNum === 1) {
-    //       setJobs(res.data.jobs);
-    //     } else {
-    //       setJobs((prev) => [...prev, ...res.data.jobs]);
-    //     }
-    //     setHasMore(res.data.hasMore);
-    //     setPage(pageNum);
-    //   }
-    // } catch (err) {
-    //   console.error("Error fetching jobs:", err);
-    // } finally {
-    //   setLoading(false);
-    // }
+      if (res.data && res.data.jobs) {
+        console.log("Fetched jobs:", res.data.jobs);
+        if (pageNum === 0) {
+          setJobs(res.data.jobs); // first batch
+        } else {
+          setJobs((prev) => [...prev, ...res.data.jobs]); // append
+        }
+
+        setPage(pageNum);
+        const totalFetched = (pageNum + 1) * 20;
+        setHasMore(totalFetched < totalJobs);
+      }
+    } catch (err) {
+      console.error("Error fetching jobs:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -90,6 +99,9 @@ export default function Dashboard() {
         <h2>
           Welcome, <span className="highlight">{name || "User"}</span> 👋
         </h2>
+        <p className="job-summary">
+          Total Jobs: <b>{totalJobs}</b>
+        </p>
         <Button
           variant="contained"
           color="primary"
@@ -106,9 +118,11 @@ export default function Dashboard() {
         {jobs.length > 0 ? (
           jobs.map((job) => (
             <div key={job._id} className="job-card">
-              <h3 className="job-title">{job.job_no || "Job #"}</h3>
+              <h3 className="job-title">
+                {job.jobNo ? `Job #${job.jobNo}` : "Job"}
+              </h3>
               <p>
-                <b>Status:</b> {job.jobcard_status}
+                <b>Status:</b> {job.jobcard_status || "-"}
               </p>
               <p>
                 <b>Date:</b>{" "}
@@ -126,6 +140,7 @@ export default function Dashboard() {
           <p className="no-jobs">No jobs found.</p>
         )}
       </div>
+
 
       {/* Pagination */}
       <div className="pagination">

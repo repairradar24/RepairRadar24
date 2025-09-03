@@ -92,6 +92,46 @@ router.get("/jobs/count", authenticateAndGetUserDb, async (req, res) => {
   }
 });
 
+router.get("/jobs/getjobcards", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDb = getUserDb(req.token);
+    if (!userDb) {
+      return res.status(500).json({ error: "User DB not found" });
+    }
+
+    // Pagination params
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 20;
+    if (page < 1) page = 1;
+
+    const skip = (page - 1) * limit;
+
+    // Fetch jobs sorted by latest first
+    const jobs = await userDb
+      .collection("jobs")
+      .find({})
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    // Check if more jobs exist
+    const total = await userDb.collection("jobs").countDocuments();
+    const hasMore = skip + jobs.length < total;
+
+    res.json({
+      jobs,
+      page,
+      limit,
+      total,
+      hasMore,
+    });
+  } catch (err) {
+    console.error("Error fetching jobs:", err);
+    res.status(500).json({ error: "Server error while fetching jobs" });
+  }
+});
+
 router.get("/jobs/list", authenticateAndGetUserDb, async (req, res) => {
   try {
     const userDbConnection = await getUserDb(req.token);
@@ -125,7 +165,7 @@ router.post("/jobs/savejobcard", authenticateAndGetUserDb, async (req, res) => {
       console.log("User not found in cached backend map");
       return res.status(401).json({ error: 'Connection timed out' });
     }
-    
+
     const jobsCollection = userDbConnection.collection("jobs");
 
     const newJob = req.body;
