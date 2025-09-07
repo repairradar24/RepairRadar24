@@ -3,50 +3,94 @@ import { useNavigate } from "react-router-dom";
 import api from "../axiosConfig";
 import { Button } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import "./dashboard.css"; // ✅ import CSS file
+import "./dashboard.css";
 
 export default function Dashboard() {
   const [name, setName] = useState("");
   const [jobs, setJobs] = useState([]);
-  const [page, setPage] = useState(0); // page starts at 0
+  const [page, setPage] = useState(0);
   const [totalJobs, setTotalJobs] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [layout, setLayout] = useState(""); // 🟢 layout template string
+  const [schema, setSchema] = useState([]); // 🟢 schema fields
 
   const navigate = useNavigate();
   const token = sessionStorage.getItem("token");
   const userName = sessionStorage.getItem("userName");
 
-  // ✅ Initial load → check auth + fetch count + fetch first jobs
+  // 🟢 Utility to render layout for each job
+  const renderLayout = (job) => {
+    if (!layout) return "No layout configured";
+
+    return layout.replace(/<([^>]+)>/g, (_, fieldKey) => {
+      // handle nested like field.subField
+      if (fieldKey.includes(".")) {
+        const [parent, child] = fieldKey.split(".");
+        if (Array.isArray(job[parent])) {
+          return job[parent]
+            .map((item) => (item[child] !== undefined ? item[child] : ""))
+            .join(", ");
+        }
+        return "";
+      }
+
+      return job[fieldKey] !== undefined ? job[fieldKey] : "";
+    });
+  };
+
+  // 🟢 Initial Load
   useEffect(() => {
     if (!token) {
       alert("You are not logged in. Please sign in.");
       navigate("/");
       return;
     }
-
     if (userName) setName(userName.toUpperCase());
 
-    // 1️⃣ Fetch job count
-    api
-      .get("/user/jobs/count", {
-        headers: { authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        if (res.data && res.data.total) {
-          setTotalJobs(res.data.total);
-          if (res.data.total > 0) {
-            fetchJobs(0); // fetch first batch
+    const fetchInitialData = async () => {
+      try {
+        const schemaRes = await api.get("/user/get-config", {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        console.log(schemaRes.data);
+        
+        const layoutType = "dashboardJobLayout";
+        const layoutRes = await api.get(`/user/get-job-layout-config?layoutType=${layoutType}`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        console.log(layoutRes.data);
+        
+        const countRes = await api.get("/user/jobs/count", {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        console.log(countRes.data);
+
+        if (schemaRes.data?.schema) {
+          setSchema(schemaRes.data.schema);
+        }
+
+        if (layoutRes.data?.layout) {
+          setLayout(layoutRes.data.layout);
+        }
+
+        if (countRes.data?.total) {
+          setTotalJobs(countRes.data.total);
+          if (countRes.data.total > 0) {
+            await fetchJobs(0); // fetch first batch
           }
         }
-      })
-      .catch((err) => {
-        console.error("Error fetching job count:", err);
+      } catch (err) {
+        console.error("Error fetching initial data:", err);
         navigate("/");
-      });
+      }
+    };
+
+
+    fetchInitialData();
   }, [navigate, token, userName]);
 
-  // 2️⃣ Fetch paginated jobs (20 at a time)
+  // 🟢 Fetch jobs with pagination
   const fetchJobs = async (pageNum) => {
     setLoading(true);
     try {
@@ -56,11 +100,10 @@ export default function Dashboard() {
       );
 
       if (res.data && res.data.jobs) {
-        console.log("Fetched jobs:", res.data.jobs);
         if (pageNum === 0) {
-          setJobs(res.data.jobs); // first batch
+          setJobs(res.data.jobs);
         } else {
-          setJobs((prev) => [...prev, ...res.data.jobs]); // append
+          setJobs((prev) => [...prev, ...res.data.jobs]);
         }
 
         setPage(pageNum);
@@ -118,16 +161,11 @@ export default function Dashboard() {
         {jobs.length > 0 ? (
           jobs.map((job) => (
             <div key={job._id} className="job-card">
-              <h3 className="job-title">
-                {job.jobNo ? `Job #${job.jobNo}` : "Job"}
-              </h3>
-              <p>
-                <b>Status:</b> {job.jobcard_status || "-"}
-              </p>
-              <p>
-                <b>Date:</b>{" "}
-                {job.date ? new Date(job.date).toLocaleDateString() : "-"}
-              </p>
+              {renderLayout(job)
+                .split("\n")
+                .map((line, idx) => (
+                  <p key={idx}>{line}</p>
+                ))}
               <button
                 onClick={() => navigate(`/job/${job._id}`)}
                 className="view-btn"
@@ -141,14 +179,10 @@ export default function Dashboard() {
         )}
       </div>
 
-
       {/* Pagination */}
       <div className="pagination">
         {hasMore && !loading && (
-          <button
-            onClick={() => fetchJobs(page + 1)}
-            className="load-more-btn"
-          >
+          <button onClick={() => fetchJobs(page + 1)} className="load-more-btn">
             Load More
           </button>
         )}
