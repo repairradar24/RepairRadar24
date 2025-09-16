@@ -1,106 +1,139 @@
+/* jobcardconfig.css */
+
 .jobcard-container {
-  padding: 20px;
-  font-family: "Segoe UI", Tahoma, sans-serif;
-  background: #f9f9fc;
-  min-height: 100vh;
+  max-width: 1100px;
+  min-width: 100vw;
+  margin: 40px auto;
+  padding: 25px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  font-family: "Segoe UI", sans-serif;
+  color: #333;
 }
 
 .title {
-  font-size: 24px;
-  color: #2d2d7f;
-  margin-bottom: 20px;
-}
-
-.field-group {
-  margin-left: 15px;
-  border-left: 2px solid #ddd;
-  padding-left: 15px;
-  margin-bottom: 20px;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 25px;
+  text-align: center;
+  color: #2c3e50;
 }
 
 .field-item {
-  background: #fff;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  background: #fdfdfd;
+  padding: 15px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  border: 1px solid #e6ebf5;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.field-item:hover {
+  background: #f9fbff;
+  border-color: #cfdaf0;
 }
 
 .field-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.field-input {
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  flex: 1;
+.field-input,
+.field-select,
+.option-input {
+  padding: 8px 10px;
+  border: 1px solid #ccd6eb;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.95rem;
+  transition: border 0.2s, background 0.2s;
+  background: #ffffff;
+  color: #34495e;
 }
 
-.field-select {
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
+.field-input:focus,
+.field-select:focus,
+.option-input:focus {
+  border-color: #6c63ff;
+  box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.15);
+  background: #fdfdff;
 }
 
-.field-key {
-  font-size: 12px;
-  color: #777;
+.field-input:disabled,
+.field-select:disabled {
+  background: #f9f9f9;
+  color: #666;
+  cursor: not-allowed;
 }
 
-.remove-btn {
-  background: #ff4d4f;
-  border: none;
-  color: #fff;
-  padding: 6px 10px;
-  border-radius: 6px;
+button {
   cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
 }
 
-.remove-btn:hover {
-  background: #d9363e;
+.add-field-btn,
+.add-option-btn {
+  background: #6c63ff;
+  color: white;
+  margin-top: 8px;
+}
+
+.add-field-btn:hover,
+.add-option-btn:hover {
+  background: #5a52e6;
+}
+
+.remove-btn,
+.remove-option-btn {
+  background: #ff7b7b;
+  color: white;
+}
+
+.remove-btn:hover,
+.remove-option-btn:hover {
+  background: #e06666;
+}
+
+.move-btn {
+  background: #e1e8ff;
+  color: #333;
+}
+
+.move-btn:hover {
+  background: #c9d6ff;
 }
 
 .options-section {
-  margin-top: 8px;
+  margin-top: 12px;
+  padding-left: 15px;
+  border-left: 2px dashed #ccd6eb;
 }
 
-.option-input {
-  display: block;
-  margin: 4px 0;
-  padding: 6px 8px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-}
-
-.add-option-btn, .add-field-btn, .save-btn {
-  background: #4f8cff;
-  border: none;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-top: 8px;
-}
-
-.add-option-btn:hover,
-.add-field-btn:hover,
-.save-btn:hover {
-  background: #376bd6;
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
 }
 
 .subfields-section {
-  margin-top: 10px;
-  padding: 10px;
-  background: #f1f3f8;
-  border-radius: 6px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fafafa;
+  border: 1px dashed #d3ddee;
 }
 
 .subfields-title {
-  font-size: 14px;
-  font-weight: bold;
+  font-size: 1rem;
+  font-weight: 500;
   margin-bottom: 10px;
-  color: #444;
+  color: #34495e;
 }

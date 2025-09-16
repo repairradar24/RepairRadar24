@@ -7,21 +7,18 @@ const generateKey = (name) => {
   return name.trim().toLowerCase().replace(/\s+/g, "_");
 };
 
+// Recursive field configuration component
 const FieldConfig = ({ fields, setFields, level = 0 }) => {
   const addField = () => {
-    const newField = { name: "", key: "", type: "text", options: [], fields: [] };
-
-    // Ensure job_no first and jobcard_status last
-    const jobNo = fields.find(f => f.key === "job_no");
-    const jobStatus = fields.find(f => f.key === "jobcard_status");
-    const middleFields = fields.filter(
-      f => f.key !== "job_no" && f.key !== "jobcard_status"
-    );
-
-    // Insert new field in the middle
-    const updated = [jobNo, ...middleFields, newField, jobStatus].filter(Boolean);
-
-    setFields(updated);
+    const newField = {
+      name: "",
+      key: "",
+      type: "text", // always text by default
+      options: [],
+      fields: [],
+      mandatory: false,
+    };
+    setFields([...fields, newField]);
   };
 
   const updateField = (index, key, value) => {
@@ -32,19 +29,12 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
       updated[index].key = generateKey(value);
     }
 
-    if (key === "type" && value !== "dropdown" && value !== "list") {
-      updated[index].options = [];
-    }
-    if (key === "type" && value !== "list") {
-      updated[index].fields = [];
-    }
-
     setFields(updated);
   };
 
   const addOption = (index) => {
     const updated = [...fields];
-    updated[index].options.push({ value: "", displayByDefault: false });
+    updated[index].options.push({ value: "" });
     setFields(updated);
   };
 
@@ -62,11 +52,19 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
 
   const removeField = (index) => {
     const field = fields[index];
-    if (field.key === "job_no" || field.key === "jobcard_status") {
+    if (field.mandatory) {
       alert(`The field "${field.name}" is mandatory and cannot be removed.`);
       return;
     }
     setFields(fields.filter((_, i) => i !== index));
+  };
+
+  const moveField = (index, direction) => {
+    const updated = [...fields];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= fields.length) return;
+    [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+    setFields(updated);
   };
 
   return (
@@ -80,34 +78,42 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
               placeholder="Field Name"
               value={field.name}
               onChange={(e) => updateField(index, "name", e.target.value)}
-              disabled={field.key === "job_no" || field.key === "jobcard_status"} />
-
-            <select
-              className="field-select"
-              value={field.type}
-              onChange={(e) => updateField(index, "type", e.target.value)}
-              disabled={field.key === "job_no" || field.key === "jobcard_status"}
-            >
-              <option value="text">Text</option>
-              <option value="number">Number</option>
-              <option value="dropdown">Dropdown</option>
-              <option value="date">Date</option>
-              <option value="checkbox">True/False</option>
-              <option value="list">List</option>
-            </select>
+              disabled={field.mandatory}
+            />
 
             <span className="field-key">({field.key})</span>
 
+            {/* Reorder buttons (mandatory + non-mandatory) */}
             <button
               type="button"
-              className="remove-btn"
-              onClick={() => removeField(index)}
+              className="move-btn"
+              onClick={() => moveField(index, -1)}
+              disabled={index === 0}
             >
-              Remove
+              ↑
             </button>
+            <button
+              type="button"
+              className="move-btn"
+              onClick={() => moveField(index, 1)}
+              disabled={index === fields.length - 1}
+            >
+              ↓
+            </button>
+
+            {/* Remove only for non-mandatory */}
+            {!field.mandatory && (
+              <button
+                type="button"
+                className="remove-btn"
+                onClick={() => removeField(index)}
+              >
+                Remove
+              </button>
+            )}
           </div>
 
-
+          {/* Dropdown Options */}
           {field.type === "dropdown" && (
             <div className="options-section">
               <button
@@ -129,11 +135,12 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
                       updateOption(index, optIndex, "value", e.target.value)
                     }
                   />
+
                   {field.key === "jobcard_status" && (
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
-                        checked={opt.displayByDefault}
+                        checked={opt.displayByDefault || false}
                         onChange={(e) =>
                           updateOption(
                             index,
@@ -146,6 +153,7 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
                       Display by Default
                     </label>
                   )}
+
                   <button
                     type="button"
                     className="remove-option-btn"
@@ -158,6 +166,7 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
             </div>
           )}
 
+          {/* Nested lists */}
           {field.type === "list" && (
             <div className="subfields-section">
               <h5 className="subfields-title">Subfields for "{field.name}"</h5>
@@ -180,7 +189,6 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
             </p>
           )}
         </div>
-
       ))}
 
       <button type="button" className="add-field-btn" onClick={addField}>
@@ -194,6 +202,55 @@ export default function JobCardConfig() {
   const [fields, setFields] = useState([]);
   const navigate = useNavigate();
 
+  const defaultConfig = [
+    { name: "Job Number", key: "job_no", type: "number", mandatory: true, options: [], fields: [] },
+    { name: "Customer Phone", key: "customer_phone", type: "text", mandatory: true, options: [], fields: [] },
+    { name: "Customer Name", key: "customer_name", type: "text", mandatory: true, options: [], fields: [] },
+    {
+      name: "Jobcard Status",
+      key: "jobcard_status",
+      type: "dropdown",
+      mandatory: true,
+      options: [
+        { value: "Pending", displayByDefault: true },
+        { value: "In Progress", displayByDefault: false },
+        { value: "Completed", displayByDefault: false },
+      ],
+      fields: [],
+    },
+    {
+      name: "Items",
+      key: "items",
+      type: "list",
+      mandatory: true,
+      options: [],
+      fields: [
+        { name: "Item Name", key: "item_name", type: "text", mandatory: true, options: [], fields: [] },
+        { name: "Item Qty", key: "item_qty", type: "number", mandatory: true, options: [], fields: [] },
+        {
+          name: "Item Status",
+          key: "item_status",
+          type: "dropdown",
+          mandatory: true,
+          options: [{ value: "Pending" }, { value: "In Progress" }, { value: "Completed" }],
+          fields: [],
+        },
+        {
+          name: "Parts",
+          key: "parts",
+          type: "list",
+          mandatory: true,
+          options: [],
+          fields: [
+            { name: "Part Name", key: "part_name", type: "text", mandatory: true, options: [], fields: [] },
+            { name: "Part Price", key: "part_price", type: "number", mandatory: true, options: [], fields: [] },
+            { name: "Part Qty", key: "part_qty", type: "number", mandatory: true, options: [], fields: [] },
+          ],
+        },
+      ],
+    },
+  ];
+
   useEffect(() => {
     const token = sessionStorage.getItem("token");
     if (!token) {
@@ -201,63 +258,13 @@ export default function JobCardConfig() {
       navigate("/");
     } else {
       api
-        .get("/user/get-config", {
-          headers: { authorization: `Bearer ${token}` },
-        })
+        .get("/user/get-config", { headers: { authorization: `Bearer ${token}` } })
         .then((resp) => {
           if (resp.status === 200) {
             let schema = resp.data.schema || [];
-
-            console.log("Fetched configuration:", schema);
-
-            // ensure mandatory fields exist
-            if (!schema.some((f) => f.key === "job_no")) {
-              schema.unshift({
-                name: "Job Number",
-                key: "job_no",
-                type: "number",
-                options: [],
-                fields: [],
-              });
-            }
-
-            if (!schema.some((f) => f.key === "jobcard_status")) {
-              schema.push({
-                name: "Jobcard Status",
-                key: "jobcard_status",
-                type: "dropdown",
-                options: [
-                  { value: "Pending", displayByDefault: true },
-                  { value: "In Progress", displayByDefault: false },
-                  { value: "Completed", displayByDefault: false },
-                ],
-                fields: [],
-              });
-            }
-
-            setFields(schema);
+            setFields(schema.length ? schema : defaultConfig);
           } else if (resp.status === 204) {
-            console.log("No configuration found, starting with defaults.");
-            setFields([
-              {
-                name: "Job Number",
-                key: "job_no",
-                type: "number",
-                options: [],
-                fields: [],
-              },
-              {
-                name: "Jobcard Status",
-                key: "jobcard_status",
-                type: "dropdown",
-                options: [
-                  { value: "Pending", displayByDefault: true },
-                  { value: "In Progress", displayByDefault: false },
-                  { value: "Completed", displayByDefault: false },
-                ],
-                fields: [],
-              },
-            ]);
+            setFields(defaultConfig);
           }
         })
         .catch((err) => {
@@ -274,13 +281,8 @@ export default function JobCardConfig() {
 
   const saveConfig = async () => {
     const token = sessionStorage.getItem("token");
-    console.log("Saving configuration:", fields);
     await api
-      .post(
-        "/user/save-config",
-        { schema: fields },
-        { headers: { authorization: `Bearer ${token}` } }
-      )
+      .post("/user/save-config", { schema: fields }, { headers: { authorization: `Bearer ${token}` } })
       .then((resp) => {
         if (resp.status === 200) {
           alert(resp.data.message);
@@ -291,7 +293,6 @@ export default function JobCardConfig() {
         if (err.status === 401) {
           alert("Unauthorized. Please log in again.");
           navigate("/");
-          return;
         } else {
           console.error("Error saving configuration:", err);
           alert("Failed to save configuration. Please try again.");
