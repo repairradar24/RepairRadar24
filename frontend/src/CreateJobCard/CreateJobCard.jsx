@@ -12,6 +12,9 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  Modal,
+  Box,
+  Typography,
 } from "@mui/material";
 import { AddCircle, Delete } from "@mui/icons-material";
 import api from "../axiosConfig";
@@ -23,8 +26,9 @@ export default function CreateJobCard() {
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // for right panel (sublist display)
-  const [activeSublist, setActiveSublist] = useState(null);
+  const [activeParts, setActiveParts] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [partsErrors, setPartsErrors] = useState("");
 
   // ✅ Fetch schema
   useEffect(() => {
@@ -43,7 +47,6 @@ export default function CreateJobCard() {
         if (res.data && res.data.schema) {
           setSchema(res.data.schema);
 
-          // Pre-fill defaults
           const defaults = {};
           res.data.schema.forEach((f) => {
             if (f.type === "dropdown" && f.options?.length) {
@@ -71,23 +74,24 @@ export default function CreateJobCard() {
       .finally(() => setLoading(false));
   }, [navigate]);
 
-  // ✅ Update simple fields
   const handleChange = (key, value) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  // ✅ Handle list field row updates
   const handleListChange = (listKey, rowIndex, colKey, value) => {
     const updatedList = [...(formData[listKey] || [])];
     updatedList[rowIndex] = { ...updatedList[rowIndex], [colKey]: value };
     setFormData((prev) => ({ ...prev, [listKey]: updatedList }));
   };
 
-  // ✅ Add row in list
   const addListRow = (listKey, fields) => {
     const newRow = {};
     fields.forEach((f) => {
-      if (f.type === "dropdown" && f.options?.length) {
+      if (f.key.toLowerCase().includes("qty")) {
+        newRow[f.key] = 1;
+      } else if (f.key.toLowerCase().includes("price")) {
+        newRow[f.key] = 0;
+      } else if (f.type === "dropdown" && f.options?.length) {
         newRow[f.key] = f.options[0].value;
       } else if (f.type === "checkbox") {
         newRow[f.key] = false;
@@ -103,13 +107,19 @@ export default function CreateJobCard() {
     }));
   };
 
-  // ✅ Remove row in list
   const removeListRow = (listKey, rowIndex) => {
     const updated = (formData[listKey] || []).filter((_, i) => i !== rowIndex);
     setFormData((prev) => ({ ...prev, [listKey]: updated }));
   };
 
-  // ✅ Render non-list fields
+  const calculateRepairCost = (parts = []) => {
+    return parts.reduce((sum, p) => {
+      const qty = parseFloat(p.qty) || 0;
+      const price = parseFloat(p.price) || 0;
+      return sum + qty * price;
+    }, 0);
+  };
+
   const renderSimpleField = (field, value, onChange) => {
     switch (field.type) {
       case "text":
@@ -160,8 +170,39 @@ export default function CreateJobCard() {
     }
   };
 
-  // ✅ Save job
+  // ✅ Save job with validations
   const handleSave = async () => {
+    const newErrors = {};
+
+    if (!formData.customerName || formData.customerName.trim() === "") {
+      newErrors.customerName = "Customer name is required";
+    }
+
+    if (!formData.customerPhone || formData.customerPhone.trim() === "") {
+      newErrors.customerPhone = "Customer phone is required";
+    } else if (!/^\d{10}$/.test(formData.customerPhone)) {
+      newErrors.customerPhone = "Phone number must be exactly 10 digits";
+    }
+
+    const itemsField = schema.find((f) => f.type === "list");
+    if (itemsField) {
+      const items = formData[itemsField.key] || [];
+      if (items.length === 0) {
+        newErrors.items = `At least 1 ${itemsField.name} is required`;
+      }
+      items.forEach((item, idx) => {
+        if (!item.Item || item.Item.trim() === "") {
+          newErrors[`item-${idx}`] = "Item name is required";
+        }
+      });
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
+
     const token = sessionStorage.getItem("token");
     try {
       await api.post("/user/jobs/savejobcard", formData, {
@@ -180,163 +221,208 @@ export default function CreateJobCard() {
     }
   };
 
+  // ✅ Parts Modal validation before closing
+  const handlePartsDone = () => {
+    const { parentKey, rowIndex } = activeParts;
+    const row = formData[parentKey][rowIndex];
+    for (let i = 0; i < (row.parts || []).length; i++) {
+      const part = row.parts[i];
+      if (!part.name || part.name.trim() === "") {
+        setPartsErrors("Part name is required");
+        return;
+      }
+      if (part.price === "" || part.price === null || isNaN(part.price)) {
+        setPartsErrors("Price cannot be empty");
+        return;
+      }
+    }
+    setPartsErrors("");
+    setActiveParts(null);
+  };
+
   if (loading) return <div className="loading">Loading...</div>;
 
   return (
-    <div className="split-container">
-      {/* LEFT: basic fields + first-level lists */}
-      <div className="left-panel">
-        <h2 className="title">Create New Job</h2>
-        <div className="fields-grid">
-          {schema.map((field) => {
-            if (field.type !== "list") {
-              return (
-                <div key={field.key} className="field-item">
-                  {renderSimpleField(field, formData[field.key], (val) =>
-                    handleChange(field.key, val)
-                  )}
-                </div>
-              );
-            }
+    <div className="page-container">
+      <h2 className="title">Create New Job</h2>
 
-            // First level list
-            return (
-              <div key={field.key} className="list-wrapper">
-                <h4>{field.name}</h4>
-                <Paper className="list-table">
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        {field.fields.map((sub) => (
-                          <TableCell key={sub.key}>{sub.name}</TableCell>
-                        ))}
-                        <TableCell>Sublist</TableCell>
-                        <TableCell>Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(formData[field.key] || []).map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          {field.fields.map((sub) => (
-                            <TableCell key={sub.key}>
-                              {sub.type === "list"
-                                ? "-- sublist --"
-                                : renderSimpleField(
-                                    sub,
-                                    row[sub.key],
-                                    (val) => handleListChange(field.key, rowIndex, sub.key, val)
-                                  )}
-                            </TableCell>
-                          ))}
-                          <TableCell>
-                            {field.fields.some((f) => f.type === "list") && (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() =>
-                                  setActiveSublist({
-                                    parentKey: field.key,
-                                    rowIndex,
-                                    fields: field.fields.filter((f) => f.type === "list"),
-                                  })
-                                }
-                              >
-                                View Sublist
-                              </Button>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <IconButton
-                              color="error"
-                              onClick={() => removeListRow(field.key, rowIndex)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Paper>
-                <Button
-                  startIcon={<AddCircle />}
-                  onClick={() => addListRow(field.key, field.fields)}
-                  className="add-row-btn"
-                >
-                  Add {field.name}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-
-        <Button variant="contained" color="primary" onClick={handleSave} className="save-btn">
-          Save Job
-        </Button>
+      {/* Job Details */}
+      <div className="job-details-grid">
+        {schema
+          .filter((field) => field.type !== "list")
+          .map((field) => (
+            <div key={field.key} className="field-item">
+              {renderSimpleField(field, formData[field.key], (val) =>
+                handleChange(field.key, val)
+              )}
+              {errors[field.key] && <span className="error-text">{errors[field.key]}</span>}
+            </div>
+          ))}
       </div>
 
-      {/* RIGHT: show sublist if selected */}
-      <div className="right-panel">
-        {activeSublist ? (
-          <>
-            <h3>Sublist for Row {activeSublist.rowIndex + 1}</h3>
-            {activeSublist.fields.map((sublistField) => (
-              <div key={sublistField.key} className="list-wrapper">
-                <h4>{sublistField.name}</h4>
-                <Paper className="list-table">
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        {sublistField.fields.map((sf) => (
-                          <TableCell key={sf.key}>{sf.name}</TableCell>
-                        ))}
-                        <TableCell>Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(
-                        formData[activeSublist.parentKey]?.[activeSublist.rowIndex][
-                          sublistField.key
-                        ] || []
-                      ).map((row, idx) => (
-                        <TableRow key={idx}>
-                          {sublistField.fields.map((sf) => (
-                            <TableCell key={sf.key}>
-                              {renderSimpleField(
-                                sf,
-                                row[sf.key],
-                                (val) => {
-                                  const updated = [...formData[activeSublist.parentKey]];
-                                  updated[activeSublist.rowIndex] = {
-                                    ...updated[activeSublist.rowIndex],
-                                    [sublistField.key]: [
-                                      ...(updated[activeSublist.rowIndex][sublistField.key] || []),
-                                    ],
-                                  };
-                                  updated[activeSublist.rowIndex][sublistField.key][idx] = {
-                                    ...row,
-                                    [sf.key]: val,
-                                  };
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    [activeSublist.parentKey]: updated,
-                                  }));
-                                }
+      {/* Items List */}
+      {schema
+        .filter((field) => field.type === "list")
+        .map((field) => (
+          <div key={field.key} className="list-wrapper">
+            <h4>{field.name}</h4>
+            {errors.items && <span className="error-text">{errors.items}</span>}
+            <Paper className="list-table">
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    {field.fields
+                      .filter((f) => f.type !== "list")
+                      .map((sub) => (
+                        <TableCell key={sub.key}>{sub.name}</TableCell>
+                      ))}
+                    <TableCell>Repair Cost</TableCell>
+                    <TableCell>Parts</TableCell>
+                    <TableCell>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(formData[field.key] || []).map((row, rowIndex) => (
+                    <TableRow key={rowIndex}>
+                      {field.fields
+                        .filter((f) => f.type !== "list")
+                        .map((sub) => (
+                          <TableCell key={sub.key}>
+                            {renderSimpleField(
+                              sub,
+                              row[sub.key],
+                              (val) => handleListChange(field.key, rowIndex, sub.key, val)
+                            )}
+                            {errors[`item-${rowIndex}`] &&
+                              sub.key === "Item" && (
+                                <span className="error-text">
+                                  {errors[`item-${rowIndex}`]}
+                                </span>
                               )}
-                            </TableCell>
-                          ))}
+                          </TableCell>
+                        ))}
+                      <TableCell>
+                        ₹{calculateRepairCost(row.parts || []).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setActiveParts({ parentKey: field.key, rowIndex })}
+                        >
+                          Parts
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton
+                          color="error"
+                          onClick={() => removeListRow(field.key, rowIndex)}
+                        >
+                          <Delete />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Paper>
+            <Button
+              startIcon={<AddCircle />}
+              onClick={() => addListRow(field.key, field.fields)}
+              className="add-row-btn"
+            >
+              Add {field.name}
+            </Button>
+          </div>
+        ))}
+
+      <Button variant="contained" color="primary" onClick={handleSave} className="save-btn">
+        Save Job
+      </Button>
+
+      {/* Parts Modal */}
+      <Modal open={!!activeParts} onClose={() => setActiveParts(null)}>
+        <Box className="modal-box">
+          <Typography variant="h6">Parts</Typography>
+          {activeParts && (
+            <>
+              <Paper className="list-table">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Part Name</TableCell>
+                      <TableCell>Qty</TableCell>
+                      <TableCell>Price</TableCell>
+                      <TableCell>Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(formData[activeParts.parentKey]?.[activeParts.rowIndex].parts || []).map(
+                      (p, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            <TextField
+                              value={p.name || ""}
+                              onChange={(e) => {
+                                const updated = [...formData[activeParts.parentKey]];
+                                updated[activeParts.rowIndex].parts[idx] = {
+                                  ...p,
+                                  name: e.target.value,
+                                };
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  [activeParts.parentKey]: updated,
+                                }));
+                              }}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              type="number"
+                              value={p.qty || 1}
+                              onChange={(e) => {
+                                const updated = [...formData[activeParts.parentKey]];
+                                updated[activeParts.rowIndex].parts[idx] = {
+                                  ...p,
+                                  qty: e.target.value,
+                                };
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  [activeParts.parentKey]: updated,
+                                }));
+                              }}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              type="number"
+                              value={p.price || 0}
+                              onChange={(e) => {
+                                const updated = [...formData[activeParts.parentKey]];
+                                updated[activeParts.rowIndex].parts[idx] = {
+                                  ...p,
+                                  price: e.target.value,
+                                };
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  [activeParts.parentKey]: updated,
+                                }));
+                              }}
+                              size="small"
+                            />
+                          </TableCell>
                           <TableCell>
                             <IconButton
                               color="error"
                               onClick={() => {
-                                const updated = [...formData[activeSublist.parentKey]];
-                                updated[activeSublist.rowIndex][sublistField.key] =
-                                  updated[activeSublist.rowIndex][sublistField.key].filter(
-                                    (_, i) => i !== idx
-                                  );
+                                const updated = [...formData[activeParts.parentKey]];
+                                updated[activeParts.rowIndex].parts =
+                                  updated[activeParts.rowIndex].parts.filter((_, i) => i !== idx);
                                 setFormData((prev) => ({
                                   ...prev,
-                                  [activeSublist.parentKey]: updated,
+                                  [activeParts.parentKey]: updated,
                                 }));
                               }}
                             >
@@ -344,40 +430,39 @@ export default function CreateJobCard() {
                             </IconButton>
                           </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Paper>
-                <Button
-                  startIcon={<AddCircle />}
-                  onClick={() => {
-                    const updated = [...formData[activeSublist.parentKey]];
-                    const currentList =
-                      updated[activeSublist.rowIndex][sublistField.key] || [];
-                    const newRow = {};
-                    sublistField.fields.forEach((sf) => {
-                      newRow[sf.key] = "";
-                    });
-                    updated[activeSublist.rowIndex][sublistField.key] = [
-                      ...currentList,
-                      newRow,
-                    ];
-                    setFormData((prev) => ({
-                      ...prev,
-                      [activeSublist.parentKey]: updated,
-                    }));
-                  }}
-                  className="add-row-btn"
-                >
-                  Add {sublistField.name}
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </Paper>
+              {partsErrors && <span className="error-text">{partsErrors}</span>}
+              <Button
+                startIcon={<AddCircle />}
+                onClick={() => {
+                  const updated = [...formData[activeParts.parentKey]];
+                  const currentParts = updated[activeParts.rowIndex].parts || [];
+                  updated[activeParts.rowIndex].parts = [
+                    ...currentParts,
+                    { name: "", qty: 1, price: 0 },
+                  ];
+                  setFormData((prev) => ({
+                    ...prev,
+                    [activeParts.parentKey]: updated,
+                  }));
+                }}
+                className="add-row-btn"
+              >
+                Add Part
+              </Button>
+              <div className="modal-actions">
+                <Button variant="contained" onClick={handlePartsDone}>
+                  Done
                 </Button>
               </div>
-            ))}
-          </>
-        ) : (
-          <p className="no-sublist">Select a row to view its sublist</p>
-        )}
-      </div>
+            </>
+          )}
+        </Box>
+      </Modal>
     </div>
   );
 }
