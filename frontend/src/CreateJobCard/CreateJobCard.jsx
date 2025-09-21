@@ -236,7 +236,6 @@ export default function CreateJobCard() {
     }
   };
 
-
   // ✅ Parts Modal validation before closing
   const handlePartsDone = () => {
     const { parentKey, rowIndex } = activeParts;
@@ -258,7 +257,6 @@ export default function CreateJobCard() {
     setPartsErrors("");
     setActiveParts(null);
   };
-
 
   if (loading) return <div className="loading">Loading...</div>;
 
@@ -302,47 +300,66 @@ export default function CreateJobCard() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {(formData[field.key] || []).map((row, rowIndex) => (
-                    <TableRow key={rowIndex}>
-                      {field.fields
-                        .filter((f) => f.type !== "list")
-                        .map((sub) => (
-                          <TableCell key={sub.key}>
-                            {renderSimpleField(
-                              sub,
-                              row[sub.key],
-                              (val) => handleListChange(field.key, rowIndex, sub.key, val)
-                            )}
-                            {errors[`item-${rowIndex}`] &&
-                              sub.key === "Item" && (
-                                <span className="error-text">
-                                  {errors[`item-${rowIndex}`]}
-                                </span>
+                  {(formData[field.key] || []).map((row, rowIndex) => {
+                    // ✅ Find the item_status field from schema
+                    const statusField = field.fields.find((f) => f.key === "item_status");
+                    let rowColor = "";
+                    if (statusField && row.item_status) {
+                      const selectedOpt = statusField.options.find(
+                        (opt) => opt.value === row.item_status
+                      );
+                      if (selectedOpt?.color) {
+                        rowColor = selectedOpt.color;
+                      }
+                    }
+
+                    return (
+                      <TableRow
+                        key={rowIndex}
+                        style={{
+                          backgroundColor: rowColor ? rowColor + "20" : "transparent", // light tint
+                        }}
+                      >
+                        {field.fields
+                          .filter((f) => f.type !== "list")
+                          .map((sub) => (
+                            <TableCell key={sub.key}>
+                              {renderSimpleField(
+                                sub,
+                                row[sub.key],
+                                (val) => handleListChange(field.key, rowIndex, sub.key, val)
                               )}
-                          </TableCell>
-                        ))}
-                      <TableCell>
-                        ₹{calculateRepairCost(row.parts || []).toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => setActiveParts({ parentKey: field.key, rowIndex })}
-                        >
-                          Parts
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <IconButton
-                          color="error"
-                          onClick={() => removeListRow(field.key, rowIndex)}
-                        >
-                          <Delete />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                              {errors[`item-${rowIndex}`] &&
+                                sub.key === "Item" && (
+                                  <span className="error-text">
+                                    {errors[`item-${rowIndex}`]}
+                                  </span>
+                                )}
+                            </TableCell>
+                          ))}
+                        <TableCell>
+                          ₹{calculateRepairCost(row.parts || []).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setActiveParts({ parentKey: field.key, rowIndex })}
+                          >
+                            Parts
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <IconButton
+                            color="error"
+                            onClick={() => removeListRow(field.key, rowIndex)}
+                          >
+                            <Delete />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </Paper>
