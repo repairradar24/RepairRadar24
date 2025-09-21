@@ -153,7 +153,7 @@ export default function Dashboard() {
               </table>
 
               <button
-                onClick={() => navigate(`/job/${job._id}`)}
+                onClick={() => navigate(`/jobs/${job._id}`)}
                 className="view-btn"
               >
                 View Details

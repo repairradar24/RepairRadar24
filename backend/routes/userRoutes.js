@@ -192,6 +192,45 @@ router.post("/jobs/savejobcard", authenticateAndGetUserDb, async (req, res) => {
   }
 });
 
+router.get("/jobs/getjobcard/:id", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDbConnection = await getUserDb(req.token);
+    if (!userDbConnection) return res.status(401).json({ error: "Connection timed out" });
+
+    const jobsCollection = userDbConnection.collection("jobs");
+    const job = await jobsCollection.findOne({ _id: new ObjectId(req.params.id) });
+
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    res.json({ job });
+  } catch (err) {
+    console.error("Error fetching job:", err);
+    res.status(500).json({ error: "Failed to fetch job" });
+  }
+});
+
+router.put("/jobs/updatejobcard/:id", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDbConnection = await getUserDb(req.token);
+    if (!userDbConnection) return res.status(401).json({ error: "Connection timed out" });
+
+    const jobsCollection = userDbConnection.collection("jobs");
+    const { _id, job_no, ...updates } = req.body; // prevent changing job_no
+
+    const result = await jobsCollection.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: updates }
+    );
+
+    if (result.matchedCount === 0) return res.status(404).json({ error: "Job not found" });
+
+    res.json({ success: true, message: "Job updated successfully" });
+  } catch (err) {
+    console.error("Error updating job:", err);
+    res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
 
 
 
