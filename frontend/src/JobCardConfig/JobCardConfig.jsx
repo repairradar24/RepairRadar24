@@ -34,7 +34,7 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
 
   const addOption = (index) => {
     const updated = [...fields];
-    updated[index].options.push({ value: "" });
+    updated[index].options.push({ value: "", color: "#ffffff" }); // default color
     setFields(updated);
   };
 
@@ -83,7 +83,7 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
 
             <span className="field-key">({field.key})</span>
 
-            {/* Reorder buttons (mandatory + non-mandatory) */}
+            {/* Reorder buttons */}
             <button
               type="button"
               className="move-btn"
@@ -136,6 +136,20 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
                     }
                   />
 
+                  {/* Color Picker with Label + Tooltip */}
+                  <label className="color-picker-label">
+                    🎨 Color:
+                    <input
+                      type="color"
+                      className="color-input"
+                      value={opt.color || "#cccccc"}
+                      onChange={(e) =>
+                        updateOption(index, optIndex, "color", e.target.value)
+                      }
+                      title="Click to select a color for this status"
+                    />
+                  </label>
+
                   {field.key === "jobcard_status" && (
                     <label className="checkbox-label">
                       <input
@@ -162,6 +176,7 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
                     ✕
                   </button>
                 </div>
+
               ))}
             </div>
           )}
@@ -212,9 +227,9 @@ export default function JobCardConfig() {
       type: "dropdown",
       mandatory: true,
       options: [
-        { value: "Pending", displayByDefault: true },
-        { value: "In Progress", displayByDefault: false },
-        { value: "Completed", displayByDefault: false },
+        { value: "Pending", displayByDefault: true, color: "#ffcc00" },
+        { value: "In Progress", displayByDefault: false, color: "#00bfff" },
+        { value: "Completed", displayByDefault: false, color: "#4caf50" },
       ],
       fields: [],
     },
@@ -232,7 +247,11 @@ export default function JobCardConfig() {
           key: "item_status",
           type: "dropdown",
           mandatory: true,
-          options: [{ value: "Pending" }, { value: "In Progress" }, { value: "Completed" }],
+          options: [
+            { value: "Pending", color: "#ffcc00" },
+            { value: "In Progress", color: "#00bfff" },
+            { value: "Completed", color: "#4caf50" },
+          ],
           fields: [],
         },
         {
