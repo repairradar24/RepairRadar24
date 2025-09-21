@@ -172,39 +172,54 @@ export default function CreateJobCard() {
 
   // ✅ Save job with validations
   const handleSave = async () => {
+    setErrors({});
     const newErrors = {};
+    const alertMessages = [];
 
-    if (!formData.customerName || formData.customerName.trim() === "") {
-      newErrors.customerName = "Customer name is required";
+    // 🔹 Customer name validation
+    if (!formData.customer_name || formData.customer_name.trim() === "") {
+      newErrors.customer_name = "Customer name is required";
+      alertMessages.push("Customer name is required");
     }
 
-    if (!formData.customerPhone || formData.customerPhone.trim() === "") {
-      newErrors.customerPhone = "Customer phone is required";
-    } else if (!/^\d{10}$/.test(formData.customerPhone)) {
-      newErrors.customerPhone = "Phone number must be exactly 10 digits";
+    // 🔹 Customer phone validation
+    if (!formData.customer_phone || formData.customer_phone.trim() === "") {
+      newErrors.customer_phone = "Customer phone is required";
+      alertMessages.push("Customer phone is required");
+    } else if (!/^\d{10}$/.test(formData.customer_phone)) {
+      newErrors.customer_phone = "Phone number must be exactly 10 digits";
+      alertMessages.push("Phone number must be exactly 10 digits");
     }
 
-    const itemsField = schema.find((f) => f.type === "list");
-    if (itemsField) {
-      const items = formData[itemsField.key] || [];
-      if (items.length === 0) {
-        newErrors.items = `At least 1 ${itemsField.name} is required`;
-      }
+    // 🔹 Items validation
+    const items = formData.items || [];
+    if (items.length === 0) {
+      newErrors.items = "At least 1 item is required";
+      alertMessages.push("At least 1 item is required");
+    } else {
       items.forEach((item, idx) => {
-        if (!item.Item || item.Item.trim() === "") {
+        if (!item.item_name || item.item_name.trim() === "") {
           newErrors[`item-${idx}`] = "Item name is required";
+          alertMessages.push(`Item name is required in row ${idx + 1}`);
+        }
+        if (!item.item_qty || item.item_qty <= 0) {
+          newErrors[`qty-${idx}`] = "Quantity must be greater than 0";
+          alertMessages.push(`Quantity must be greater than 0 in row ${idx + 1}`);
         }
       });
     }
 
-    if (Object.keys(newErrors).length > 0) {
+    // 🔹 Stop if errors exist
+    if (alertMessages.length > 0) {
       setErrors(newErrors);
+      alert(alertMessages.join("\n"));
       return;
     }
-    setErrors({});
 
-    const token = sessionStorage.getItem("token");
+    console.log("Saving job with data:", formData);
+
     try {
+      const token = sessionStorage.getItem("token");
       await api.post("/user/jobs/savejobcard", formData, {
         headers: { authorization: `Bearer ${token}` },
       });
@@ -221,17 +236,21 @@ export default function CreateJobCard() {
     }
   };
 
+
   // ✅ Parts Modal validation before closing
   const handlePartsDone = () => {
     const { parentKey, rowIndex } = activeParts;
     const row = formData[parentKey][rowIndex];
+
     for (let i = 0; i < (row.parts || []).length; i++) {
       const part = row.parts[i];
       if (!part.name || part.name.trim() === "") {
+        alert("Part name is required");
         setPartsErrors("Part name is required");
         return;
       }
       if (part.price === "" || part.price === null || isNaN(part.price)) {
+        alert("Price cannot be empty");
         setPartsErrors("Price cannot be empty");
         return;
       }
@@ -239,6 +258,7 @@ export default function CreateJobCard() {
     setPartsErrors("");
     setActiveParts(null);
   };
+
 
   if (loading) return <div className="loading">Loading...</div>;
 
