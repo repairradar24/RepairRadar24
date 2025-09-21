@@ -135,7 +135,7 @@ export default function JobCardDetails() {
                 size="small"
               />
             )}
-            disabled={isJobNo} // job number is not editable
+            disabled={isJobNo}
           />
         );
 
@@ -207,6 +207,28 @@ export default function JobCardDetails() {
 
   // ✅ Parts Modal validation before closing
   const handlePartsDone = () => {
+    const updated = [...formData[activeParts.parentKey]];
+    const rowParts = updated[activeParts.rowIndex].parts || [];
+
+    // Check for empty part names
+    for (let p of rowParts) {
+      if (!p.name?.trim()) {
+        setPartsErrors("Part name cannot be empty.");
+        return;
+      }
+    }
+
+    // Reset empty price values to 0
+    updated[activeParts.rowIndex].parts = rowParts.map((p) => ({
+      ...p,
+      price: p.price === "" || p.price == null ? 0 : p.price,
+    }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [activeParts.parentKey]: updated,
+    }));
+
     setPartsErrors("");
     setActiveParts(null);
   };
@@ -382,12 +404,12 @@ export default function JobCardDetails() {
                           <TableCell>
                             <TextField
                               type="number"
-                              value={p.price || 0}
+                              value={p.price}
                               onChange={(e) => {
                                 const updated = [...formData[activeParts.parentKey]];
                                 updated[activeParts.rowIndex].parts[idx] = {
                                   ...p,
-                                  price: e.target.value,
+                                  price: e.target.value, // can be empty temporarily
                                 };
                                 setFormData((prev) => ({
                                   ...prev,
