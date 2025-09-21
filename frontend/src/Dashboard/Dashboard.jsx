@@ -12,59 +12,10 @@ export default function Dashboard() {
   const [totalJobs, setTotalJobs] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [layout, setLayout] = useState(""); // 🟢 layout template string
-  const [schema, setSchema] = useState([]); // 🟢 schema fields
 
   const navigate = useNavigate();
   const token = sessionStorage.getItem("token");
   const userName = sessionStorage.getItem("userName");
-
-  // 🟢 Utility to render layout for each job
-  function renderLayout(job) {
-  if (!layout) return null;
-
-  const lines = layout.split("\n");
-
-  return (
-    <>
-      {lines.map((line, idx) => {
-        // if line contains a list placeholder like <items.something>
-        if (line.includes("<items.")) {
-          const listField = "items"; // adjust if you have multiple lists
-          const listData = job[listField] || [];
-
-          return (
-            <div key={idx}>
-              {listData.length === 0 ? (
-                <p>-</p>
-              ) : (
-                listData.map((row, rIdx) => {
-                  // replace each <items.subfield> with row[subfield]
-                  const replaced = line.replace(/<items\.([^>]+)>/g, (_, subKey) => {
-                    return row[subKey] ?? "-";
-                  });
-                  return <p key={rIdx}>{replaced}</p>;
-                })
-              )}
-            </div>
-          );
-        }
-
-        // normal (non-list) line
-        const replacedLine = line.replace(/<([^>]+)>/g, (_, key) => {
-          const keys = key.split(".");
-          let value = job;
-          for (let k of keys) value = value ? value[k] : null;
-          return value ?? "-";
-        });
-
-        return <p key={idx}>{replacedLine}</p>;
-      })}
-    </>
-  );
-}
-
-
 
   // 🟢 Initial Load
   useEffect(() => {
@@ -77,29 +28,9 @@ export default function Dashboard() {
 
     const fetchInitialData = async () => {
       try {
-        const schemaRes = await api.get("/user/get-config", {
-          headers: { authorization: `Bearer ${token}` },
-        });
-        console.log(schemaRes.data);
-
-        const layoutType = "dashboardJobLayout";
-        const layoutRes = await api.get(`/user/get-job-layout-config?layoutType=${layoutType}`, {
-          headers: { authorization: `Bearer ${token}` },
-        });
-        console.log(layoutRes.data);
-
         const countRes = await api.get("/user/jobs/count", {
           headers: { authorization: `Bearer ${token}` },
         });
-        console.log(countRes.data);
-
-        if (schemaRes.data?.schema) {
-          setSchema(schemaRes.data.schema);
-        }
-
-        if (layoutRes.data?.layout) {
-          setLayout(layoutRes.data.layout);
-        }
 
         if (countRes.data?.total) {
           setTotalJobs(countRes.data.total);
@@ -112,7 +43,6 @@ export default function Dashboard() {
         navigate("/");
       }
     };
-
 
     fetchInitialData();
   }, [navigate, token, userName]);
@@ -188,7 +118,40 @@ export default function Dashboard() {
         {jobs.length > 0 ? (
           jobs.map((job) => (
             <div key={job._id} className="job-card">
-              {renderLayout(job)} {/* no split here */}
+              <h3>Job #{job.job_no || "-"}</h3>
+              <p>
+                <b>Customer:</b> {job.customer_name || "-"}
+              </p>
+              <p>
+                <b>Phone:</b> {job.customer_phone || "-"}
+              </p>
+
+              {/* Items table */}
+              <table className="items-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {job.items && job.items.length > 0 ? (
+                    job.items.map((item, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          {item.item_qty > 1
+                            ? `${item.item_name} (${item.item_qty})`
+                            : item.item_name}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td>-</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
               <button
                 onClick={() => navigate(`/job/${job._id}`)}
                 className="view-btn"
