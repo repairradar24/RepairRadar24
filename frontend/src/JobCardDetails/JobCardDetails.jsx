@@ -340,9 +340,25 @@ export default function JobCardDetails() {
           </div>
         ))}
 
-      <Button variant="contained" color="primary" onClick={handleSave} className="save-btn">
-        Save Changes
-      </Button>
+      <div className="action-buttons">
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSave}
+          className="save-btn"
+        >
+          Save Changes
+        </Button>
+
+        <Button
+          variant="contained"
+          color="secondary" // different color
+          onClick={() => navigate("/dashboard")} // discard = go back without saving
+          className="save-btn"
+        >
+          Discard
+        </Button>
+      </div>
 
       {/* Parts Modal */}
       <Modal open={!!activeParts} onClose={() => setActiveParts(null)}>
