@@ -95,27 +95,31 @@ router.post('/signin', async (req, res) => {
   }
 });
 
+const extractHeaderToken = (req) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) {
+    console.log("No auth header");
+    return res.status(401).json({ success: false, message: "No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ success: false, message: "Invalid token format" });
+  }
+
+  // 2️⃣ Verify token
+  let decoded;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+    return decoded;
+  } catch (err) {
+    return res.status(401).json({ success: false, message: "Invalid or expired token" });
+  }
+}
+
 router.put("/update-name", async (req, res) => {
   try {
-    // 1️⃣ Extract Authorization header
-    const authHeader = req.headers["authorization"];
-    if (!authHeader) {
-      console.log("No auth header");
-      return res.status(401).json({ success: false, message: "No token provided" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ success: false, message: "Invalid token format" });
-    }
-
-    // 2️⃣ Verify token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (err) {
-      return res.status(401).json({ success: false, message: "Invalid or expired token" });
-    }
+    const decoded = extractHeaderToken(req);
 
     const userId = decoded.userId; // signed at login
     if (!userId) {
@@ -133,7 +137,7 @@ router.put("/update-name", async (req, res) => {
 
     // 5️⃣ Update user
     const result = await db.collection("users").findOneAndUpdate(
-      { _id: new ObjectId(userId)},
+      { _id: new ObjectId(userId) },
       { $set: { name } },
       { returnDocument: "after" }
     );
@@ -151,6 +155,50 @@ router.put("/update-name", async (req, res) => {
   } catch (err) {
     console.error("Error updating name:", err);
     return res.status(500).json({ success: false, message: "Server error during update" });
+  }
+});
+
+router.post("/verify-password", async (req, res) => {
+  try {
+
+    const decoded = extractHeaderToken(req);
+
+    const { currentPassword } = req.body;
+    const userId = decoded.userId; // assuming you have auth middleware
+    const db = await getMainDb();
+    const user = await db.collection("users").findOne({ _id: new ObjectId(userId) });
+
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (match) {
+      return res.status(200).json({ verified: true });
+    } else {
+      return res.status(401).json({ verified: false });
+    }
+  } catch (err) {
+    console.error("Error verifying password:", err);
+    res.status(500).json({ message: "Error verifying password" });
+  }
+});
+
+// Update password
+router.put("/update-password", async (req, res) => {
+  try {
+
+    const decoded = extractHeaderToken(req);
+    const { password } = req.body;
+    const userId = decoded.userId;
+    const db = await getMainDb();
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await db.collection("users").updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { password: hashedPassword } }
+    );
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (err) {
+    console.error("Error verifying password:", err);
+    res.status(500).json({ message: "Error updating password" });
   }
 });
 
