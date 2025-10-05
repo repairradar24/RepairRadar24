@@ -231,7 +231,105 @@ router.put("/jobs/updatejobcard/:id", authenticateAndGetUserDb, async (req, res)
   }
 });
 
+router.get("/whatsapp/get-messages", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDbConnection = await getUserDb(req.token);
+    if (!userDbConnection)
+      return res.status(401).json({ error: "Connection timed out" });
 
+    const messages = await userDbConnection
+      .collection("whatsapp_messages")
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json(messages);
+  } catch (err) {
+    console.error("Error fetching WhatsApp messages:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+router.post("/whatsapp/create-message", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDbConnection = await getUserDb(req.token);
+    if (!userDbConnection) return res.status(401).json({ error: "Connection timed out" });
+
+    const { name, text } = req.body;
+
+    if (!name || !text) {
+      return res.status(400).json({ error: "Name and text are required." });
+    }
+
+    // const db = await getMainDb();
+    await userDbConnection.collection("whatsapp_messages").insertOne({
+      name,
+      text,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    res.status(201).json({
+      message: "Message created successfully",
+      data: { name, text },
+    });
+  } catch (err) {
+    console.error("Error creating WhatsApp message:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+router.put("/whatsapp/update-message/:id", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDbConnection = await getUserDb(req.token);
+    if (!userDbConnection)
+      return res.status(401).json({ error: "Connection timed out" });
+
+    const { id } = req.params;
+    const { name, text } = req.body;
+
+    if (!name || !text)
+      return res.status(400).json({ error: "Name and text are required." });
+
+    const result = await userDbConnection
+      .collection("whatsapp_messages")
+      .updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { name, text, updatedAt: new Date() } }
+      );
+
+    if (result.matchedCount === 0)
+      return res.status(404).json({ error: "Message not found." });
+
+    res.status(200).json({ message: "Message updated successfully." });
+  } catch (err) {
+    console.error("Error updating WhatsApp message:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+router.delete("/whatsapp/delete-message/:id", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDbConnection = await getUserDb(req.token);
+    if (!userDbConnection)
+      return res.status(401).json({ error: "Connection timed out" });
+
+    const { id } = req.params;
+
+    const result = await userDbConnection
+      .collection("whatsapp_messages")
+      .deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0)
+      return res.status(404).json({ error: "Message not found." });
+
+    res.status(200).json({ message: "Message deleted successfully." });
+  } catch (err) {
+    console.error("Error deleting WhatsApp message:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
 
 
 module.exports = router;
