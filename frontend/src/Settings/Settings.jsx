@@ -117,7 +117,7 @@ const Settings = () => {
         try {
             const payload = {
                 name: messageName.trim(),
-                text: customText.trim(),
+                text: customText.replace(/\n/g, "\\n").trim(),
             };
 
             let res;
@@ -246,37 +246,6 @@ const Settings = () => {
             console.error("Error updating password:", err);
             alert(err.response?.data?.message || "Password update failed.");
         }
-    };
-
-    const getSelectableFields = (schema) => {
-        if (!schema) return [];
-
-        const usefulKeys = [
-            "job_no",
-            "customer_name",
-            "customer_phone",
-            "item_name",
-            "item_qty",
-            "item_serial",
-        ];
-
-        const fields = [];
-
-        schema.forEach((field) => {
-            if (usefulKeys.includes(field.key)) {
-                fields.push({ name: field.name, key: field.key });
-            }
-
-            if (field.key === "items" && Array.isArray(field.fields)) {
-                field.fields.forEach((sub) => {
-                    if (usefulKeys.includes(sub.key)) {
-                        fields.push({ name: sub.name, key: sub.key });
-                    }
-                });
-            }
-        });
-
-        return fields;
     };
 
     const insertField = (key) => {
