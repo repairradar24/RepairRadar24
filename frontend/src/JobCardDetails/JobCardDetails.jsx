@@ -15,10 +15,14 @@ import {
   Modal,
   Box,
   Typography,
+  Checkbox, // 🟢 NEW
+  List,
+  ListItemButton,
+  ListItemText,
 } from "@mui/material";
-import { AddCircle, Delete } from "@mui/icons-material";
+import { AddCircle, Delete, WhatsApp } from "@mui/icons-material"; // 🟢 NEW
 import api from "../axiosConfig";
-import "./jobcarddetails.css"; // ✅ reuse same css
+import "./jobcarddetails.css";
 
 export default function JobCardDetails() {
   const { id } = useParams();
@@ -26,10 +30,12 @@ export default function JobCardDetails() {
   const [schema, setSchema] = useState([]);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
-
   const [activeParts, setActiveParts] = useState(null);
   const [errors, setErrors] = useState({});
   const [partsErrors, setPartsErrors] = useState("");
+  const [whatsappItems, setWhatsappItems] = useState([]); // 🟢 NEW
+  const [whatsappMessages, setWhatsappMessages] = useState([]); // 🟢 NEW
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false); // 🟢 NEW
 
   // ✅ Fetch schema + job data
   useEffect(() => {
@@ -45,7 +51,10 @@ export default function JobCardDetails() {
       api.get(`/user/jobs/getjobcard/${id}`, { headers: { authorization: `Bearer ${token}` } }),
     ])
       .then(([schemaRes, jobRes]) => {
-        if (schemaRes.data?.schema) setSchema(schemaRes.data.schema);
+        if (schemaRes.data?.schema) {
+          console.log("Schema fetched:", schemaRes.data.schema);
+          setSchema(schemaRes.data.schema);
+        }
         if (jobRes.data?.job) setFormData(jobRes.data.job);
       })
       .catch((err) => {
@@ -55,6 +64,20 @@ export default function JobCardDetails() {
       })
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  // 🟢 Fetch WhatsApp messages
+  const fetchWhatsappMessages = async () => {
+    try {
+      const token = sessionStorage.getItem("token");
+      const res = await api.get("user/whatsapp/get-messages", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      setWhatsappMessages(res.data || []);
+    } catch (err) {
+      console.error("Error fetching WhatsApp messages:", err);
+      alert("Could not load WhatsApp messages.");
+    }
+  };
 
   const handleChange = (key, value) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -91,7 +114,7 @@ export default function JobCardDetails() {
     parts.reduce((sum, p) => sum + (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0), 0);
 
   const renderSimpleField = (field, value, onChange) => {
-    const isJobNo = field.key === "job_no"; // Job number read-only
+    const isJobNo = field.key === "job_no";
 
     switch (field.type) {
       case "text":
@@ -108,7 +131,7 @@ export default function JobCardDetails() {
             size="small"
             error={!!errors[field.key]}
             helperText={errors[field.key]}
-            disabled={isJobNo} // job number is not editable
+            disabled={isJobNo}
           />
         );
 
@@ -127,13 +150,7 @@ export default function JobCardDetails() {
               onChange(newVal ? newVal.value : field.options[0]?.value || "")
             }
             renderInput={(params) => (
-              <TextField
-                {...params}
-                label={field.name}
-                margin="normal"
-                fullWidth
-                size="small"
-              />
+              <TextField {...params} label={field.name} margin="normal" fullWidth size="small" />
             )}
             disabled={isJobNo}
           />
@@ -166,7 +183,6 @@ export default function JobCardDetails() {
       newErrors.customer_phone = "Phone number must be 10 digits";
     }
 
-    // Items & Parts validation
     const itemsField = schema.find((f) => f.type === "list");
     if (itemsField && (formData[itemsField.key] || []).length) {
       formData[itemsField.key].forEach((item, idx) => {
@@ -185,7 +201,7 @@ export default function JobCardDetails() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // ✅ Save job (update)
+  // ✅ Save job
   const handleSave = async () => {
     if (!validateForm()) {
       alert("Please fix validation errors before saving.");
@@ -210,7 +226,6 @@ export default function JobCardDetails() {
     const updated = [...formData[activeParts.parentKey]];
     const rowParts = updated[activeParts.rowIndex].parts || [];
 
-    // Check for empty part names
     for (let p of rowParts) {
       if (!p.name?.trim()) {
         setPartsErrors("Part name cannot be empty.");
@@ -218,7 +233,6 @@ export default function JobCardDetails() {
       }
     }
 
-    // Reset empty price values to 0
     updated[activeParts.rowIndex].parts = rowParts.map((p) => ({
       ...p,
       price: p.price === "" || p.price == null ? 0 : p.price,
@@ -232,6 +246,115 @@ export default function JobCardDetails() {
     setPartsErrors("");
     setActiveParts(null);
   };
+
+  // 🟢 Toggle item selection for WhatsApp
+  const toggleWhatsappItem = (item) => {
+    setWhatsappItems((prev) => {
+      const exists = prev.some((i) => i.item_name === item.item_name);
+      if (exists) return prev.filter((i) => i.item_name !== item.item_name);
+      return [...prev, item];
+    });
+  };
+
+  // Helper to recursively search schema for a field
+  const findFieldPath = (schema, fieldKey, currentPath = []) => {
+    for (const field of schema) {
+      if (field.key === fieldKey) return [...currentPath, field.key];
+      if (field.type === "list" && Array.isArray(field.fields)) {
+        const nested = findFieldPath(field.fields, fieldKey, [...currentPath, field.key]);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  };
+
+  // Helper to safely extract value by following a path (handles arrays)
+  const extractValueByPath = (data, path) => {
+    let value = data;
+    for (const key of path) {
+      if (value == null) return "";
+      value = value[key];
+    }
+
+    if (Array.isArray(value)) {
+      // if array of objects with item_name etc.
+      if (value.length && typeof value[0] === "object") {
+        // pick all text-like values
+        const textValues = value
+          .map((obj) => Object.values(obj).find((v) => typeof v === "string"))
+          .filter(Boolean);
+        return textValues.join(", ");
+      }
+      return value.join(", ");
+    }
+
+    return value ?? "";
+  };
+
+  // ✅ Main message generator
+  function generateWhatsappMessage(template, formData) {
+    if (!template || !formData) return "";
+
+    // Helper: safely fetch nested value (like "customer.name")
+    const getValueFromFormData = (key) => {
+      if (!formData || !key) return "";
+      const parts = key.split(".");
+      let value = formData;
+      for (const part of parts) {
+        if (value && typeof value === "object" && part in value) {
+          value = value[part];
+        } else {
+          return "";
+        }
+      }
+      return value ?? "";
+    };
+
+    let message = template;
+
+    // Step 1: Handle list-type fields like items
+    if (Array.isArray(formData.items) && formData.items.length > 0) {
+      const itemKeys = Object.keys(formData.items[0] || {});
+      const itemSectionMatch = message.match(
+        new RegExp(`(.*\\{(?:${itemKeys.join("|")}).*\\}.*)`, "s")
+      );
+
+      if (itemSectionMatch) {
+        const itemTemplate = itemSectionMatch[1];
+        const itemsSection = formData.items
+          .map((item) =>
+            itemTemplate.replace(/\{(.*?)\}/g, (_, key) => {
+              const val = item[key] ?? getValueFromFormData(key) ?? "";
+              return val ? val : "";
+            })
+          )
+          // 🔥 Remove empty (), [], {}, <> around missing values
+          .map((line) =>
+            line
+              .replace(/(\(|\[|\{|\<)\s*(\)|\]|\}|\>)/g, "")
+              .replace(/\s+/g, " ")
+              .trim()
+          )
+          .join("\n");
+
+        message = message.replace(itemSectionMatch[1], itemsSection);
+      }
+    }
+
+    // Step 2: Replace remaining placeholders
+    message = message.replace(/\{(.*?)\}/g, (_, key) => {
+      const val = getValueFromFormData(key);
+      return val ? val : "";
+    });
+
+    // Step 3: Final cleanup — remove leftover empty (), [], {}, <>
+    message = message
+      .replace(/(\(|\[|\{|\<)\s*(\)|\]|\}|\>)/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return message;
+  }
 
   if (loading) return <div className="loading">Loading...</div>;
 
@@ -269,6 +392,7 @@ export default function JobCardDetails() {
                       ))}
                     <TableCell>Repair Cost</TableCell>
                     <TableCell>Parts</TableCell>
+                    <TableCell>WhatsApp</TableCell> {/* 🟢 NEW */}
                     <TableCell>Action</TableCell>
                   </TableRow>
                 </TableHead>
@@ -316,6 +440,12 @@ export default function JobCardDetails() {
                             Parts
                           </Button>
                         </TableCell>
+                        <TableCell align="center"> {/* 🟢 Checkbox */}
+                          <Checkbox
+                            checked={whatsappItems.some((i) => i.item_name === row.item_name)}
+                            onChange={() => toggleWhatsappItem(row)}
+                          />
+                        </TableCell>
                         <TableCell>
                           <IconButton
                             color="error"
@@ -340,27 +470,87 @@ export default function JobCardDetails() {
           </div>
         ))}
 
+      {/* Action Buttons */}
       <div className="action-buttons">
+        <Button variant="contained" color="primary" onClick={handleSave} className="save-btn">
+          Save Changes
+        </Button>
+
+        {/* 🟢 WhatsApp Button */}
         <Button
           variant="contained"
-          color="primary"
-          onClick={handleSave}
-          className="save-btn"
+          color="success"
+          startIcon={<WhatsApp />}
+          onClick={() => {
+            fetchWhatsappMessages();
+            setWhatsappModalOpen(true);
+          }}
         >
-          Save Changes
+          WhatsApp
         </Button>
 
         <Button
           variant="contained"
-          color="secondary" // different color
-          onClick={() => navigate("/dashboard")} // discard = go back without saving
+          color="secondary"
+          onClick={() => navigate("/dashboard")}
           className="save-btn"
         >
           Discard
         </Button>
       </div>
 
-      {/* Parts Modal */}
+      {/* WhatsApp Modal 🟢 */}
+      <Modal open={whatsappModalOpen} onClose={() => setWhatsappModalOpen(false)}>
+        <Box className="modal-box">
+          <Typography variant="h6" gutterBottom>
+            Send WhatsApp Message
+          </Typography>
+          {whatsappMessages.length === 0 ? (
+            <Typography>No messages available.</Typography>
+          ) : (
+            <List>
+              {whatsappMessages.map((msg) => (
+                <ListItemButton
+                  key={msg._id}
+                  onClick={() => {
+                    const phone = formData.customer_phone;
+                    if (!phone) {
+                      alert("No customer phone found.");
+                      return;
+                    }
+
+                    // Extract the message template
+                    const rawTemplate = msg.text || msg.message || "";
+
+                    // ✅ Use your new dynamic WhatsApp message generator
+                    const finalMessage = generateWhatsappMessage(rawTemplate, formData);
+
+                    // Encode message for WhatsApp URL
+                    const encoded = encodeURIComponent(finalMessage.trim());
+                    const whatsappUrl = `https://wa.me/91${phone}?text=${encoded}`;
+
+                    // Open WhatsApp in a new tab
+                    window.open(whatsappUrl, "_blank");
+                  }}
+                >
+                  <ListItemText
+                    primary={msg.title || "Message"}
+                    secondary={msg.text || msg.message}
+                  />
+                </ListItemButton>
+
+              ))}
+            </List>
+          )}
+          <div className="modal-actions">
+            <Button variant="contained" onClick={() => setWhatsappModalOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </Box>
+      </Modal>
+
+      {/* Parts Modal (unchanged) */}
       <Modal open={!!activeParts} onClose={() => setActiveParts(null)}>
         <Box className="modal-box">
           <Typography variant="h6">Parts</Typography>
@@ -425,7 +615,7 @@ export default function JobCardDetails() {
                                 const updated = [...formData[activeParts.parentKey]];
                                 updated[activeParts.rowIndex].parts[idx] = {
                                   ...p,
-                                  price: e.target.value, // can be empty temporarily
+                                  price: e.target.value,
                                 };
                                 setFormData((prev) => ({
                                   ...prev,
