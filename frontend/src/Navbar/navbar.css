@@ -1,38 +1,59 @@
+/* === Navbar Container === */
 .navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background-color: #1976d2;
-  padding: 10px 20px;
   color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  position: relative;
+  box-sizing: border-box;
 }
 
-.logo {
-  font-size: 1.2rem;
-  font-weight: bold;
-}
-
-.nav-links {
+/* === Navbar Sections === */
+.nav-section {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+/* Center section: username in the exact middle */
+.nav-section.center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* === Username Display === */
+.user-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* === Navigation Buttons === */
 .nav-btn {
   background: transparent;
   border: none;
   color: white;
   cursor: pointer;
   font-size: 1rem;
-  padding: 5px 10px;
-  transition: background 0.3s ease;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 0.3s ease, transform 0.1s ease;
 }
 
 .nav-btn:hover {
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+  transform: translateY(-1px);
 }
 
+/* === Settings Button (Gear Icon) === */
 .settings-btn {
-  margin-left: auto; /* pushes gear to extreme right */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
 }

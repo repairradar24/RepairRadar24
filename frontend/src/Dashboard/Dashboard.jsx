@@ -3,11 +3,10 @@ import { useNavigate } from "react-router-dom";
 import api from "../axiosConfig";
 import { Button } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import Navbar from "../Navbar/Navbar";  // ⬅️ import here
+import Navbar from "../Navbar/Navbar"; // Import Navbar
 import "./dashboard.css";
 
 export default function Dashboard() {
-  const [name, setName] = useState("");
   const [jobs, setJobs] = useState([]);
   const [page, setPage] = useState(0);
   const [totalJobs, setTotalJobs] = useState(0);
@@ -16,7 +15,6 @@ export default function Dashboard() {
 
   const navigate = useNavigate();
   const token = sessionStorage.getItem("token");
-  const userName = sessionStorage.getItem("userName");
 
   useEffect(() => {
     if (!token) {
@@ -24,7 +22,6 @@ export default function Dashboard() {
       navigate("/");
       return;
     }
-    if (userName) setName(userName.toUpperCase());
 
     const fetchInitialData = async (isRetry = false) => {
       try {
@@ -47,7 +44,7 @@ export default function Dashboard() {
           console.warn("Got 401, retrying after 0.5s...");
           setTimeout(() => fetchInitialData(true), 500);
         } else if (!isRetry) {
-          // Retry once for any other transient error
+          // Retry once for transient errors
           console.warn("Retrying fetch after 0.5s due to error...");
           setTimeout(() => fetchInitialData(true), 500);
         } else {
@@ -58,7 +55,7 @@ export default function Dashboard() {
     };
 
     fetchInitialData();
-  }, [navigate, token, userName]);
+  }, [navigate, token]);
 
   const fetchJobs = async (pageNum) => {
     setLoading(true);
@@ -93,14 +90,11 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* Navbar extracted */}
+      {/* Navbar */}
       <Navbar onLogout={handleLogout} />
 
-      {/* Welcome */}
-      <div className="welcome">
-        <h2>
-          Welcome, <span className="highlight">{name || "User"}</span> 👋
-        </h2>
+      {/* Job Summary + Create Button */}
+      <div className="job-summary-section">
         <p className="job-summary">
           Total Jobs: <b>{totalJobs}</b>
         </p>

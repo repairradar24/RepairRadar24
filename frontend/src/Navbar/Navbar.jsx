@@ -1,18 +1,30 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SettingsIcon from "@mui/icons-material/Settings";
-import "./navbar.css"; // separate css for navbar
+import "./navbar.css";
 
 export default function Navbar({ onLogout }) {
   const navigate = useNavigate();
+  const [userName, setUserName] = useState("");
+
+  useEffect(() => {
+    const storedName = sessionStorage.getItem("userName");
+    if (storedName) setUserName(storedName.toUpperCase());
+  }, []);
 
   return (
     <nav className="navbar">
-      <div className="logo">RepairRadar Dashboard</div>
-      <div className="nav-links">
+      <div className="nav-section left">
         <button onClick={() => navigate("/dashboard")} className="nav-btn">
           Home
         </button>
+      </div>
+
+      <div className="nav-section center">
+        <div className="user-name">{userName || "USER"}</div>
+      </div>
+
+      <div className="nav-section right">
         <button onClick={onLogout} className="nav-btn">
           Logout
         </button>
