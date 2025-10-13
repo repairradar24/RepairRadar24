@@ -398,7 +398,7 @@ const Settings = () => {
                             <textarea
                                 ref={customTextRef} // 👈 add ref
                                 rows="7"
-                                value={customText}
+                                value={customText.replace(/\\n/g, "\n")}
                                 onChange={(e) => setCustomText(e.target.value)}
                                 className="light-input"
                                 placeholder="Type your message or insert fields..."
@@ -408,7 +408,7 @@ const Settings = () => {
                             <div className="preview-section">
                                 <h4>Message Preview</h4>
                                 <div className="preview-box">
-                                    <pre>{customText}</pre>
+                                    <pre>{customText.replace(/\\n/g, "\n")}</pre>
                                 </div>
                             </div>
 

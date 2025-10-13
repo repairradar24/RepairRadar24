@@ -315,28 +315,35 @@ export default function JobCardDetails() {
       return value ?? "";
     };
 
-    let message = template;
+    let message = template.replace(/\\n/g, "\n"); // convert stored "\n" to real newlines
 
     // ✅ Detect list-type fields (like items)
     if (Array.isArray(formData.items) && formData.items.length > 0) {
-      // Extract all keys from one item (e.g. ["item_name", "item_qty", "item_serial"])
       const itemKeys = Object.keys(formData.items[0]);
-
-      // Find the line(s) that include any of the item keys → that’s our repeat section
       const lines = message.split(/\r?\n/);
-      const repeatLines = lines.filter((line) =>
+
+      // Find the first and last line that reference item fields
+      const firstItemLine = lines.findIndex((line) =>
         itemKeys.some((key) => line.includes(`{${key}}`))
       );
+      const lastItemLine = lines
+        .slice()
+        .reverse()
+        .findIndex((line) =>
+          itemKeys.some((key) => line.includes(`{${key}}`))
+        );
+      const lastIndex = lastItemLine >= 0 ? lines.length - 1 - lastItemLine : firstItemLine;
 
-      if (repeatLines.length > 0) {
-        const itemTemplate = repeatLines.join("\n");
+      if (firstItemLine !== -1) {
+        // The part that should be repeated (could be multiple lines)
+        const itemTemplate = lines.slice(firstItemLine, lastIndex + 1).join("\n");
 
         const selectedItems =
           selectedIndices.length > 0
             ? formData.items.filter((_, idx) => selectedIndices.includes(idx))
             : formData.items;
 
-        // Replace placeholders inside item section for each selected item
+        // Generate the repeated section
         const itemsSection = selectedItems
           .map((item) =>
             itemTemplate.replace(/\{(.*?)\}/g, (_, key) => {
@@ -352,31 +359,26 @@ export default function JobCardDetails() {
           )
           .join("\n");
 
-        // Replace the original item-related lines with the repeated section
-        message = lines
-          .map((line) =>
-            itemKeys.some((key) => line.includes(`{${key}}`))
-              ? itemsSection
-              : line
-          )
-          .join("\n");
+        // Replace the original item lines with the repeated section
+        lines.splice(firstItemLine, lastIndex - firstItemLine + 1, itemsSection);
+        message = lines.join("\n");
       }
     }
 
-    // ✅ Replace any remaining placeholders (outside item list)
+    // ✅ Replace remaining placeholders (outside item list)
     message = message.replace(/\{(.*?)\}/g, (_, key) => {
       const val = getValueFromFormData(key);
       return val || "";
     });
 
-    // ✅ Cleanup leftover empty (), [], {}, <>
-    message = message
+    // ✅ Cleanup & return
+    return message
       .replace(/(\(|\[|\{|\<)\s*(\)|\]|\}|\>)/g, "")
-      .replace(/\s+/g, " ")
+      .replace(/\s+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n") // normalize excessive blank lines
       .trim();
-
-    return message;
   }
+
 
 
 
