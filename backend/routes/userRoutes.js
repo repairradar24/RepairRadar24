@@ -163,29 +163,48 @@ router.post("/jobs/savejobcard", authenticateAndGetUserDb, async (req, res) => {
     const userDbConnection = await getUserDb(req.token);
     if (!userDbConnection) {
       console.log("User not found in cached backend map");
-      return res.status(401).json({ error: 'Connection timed out' });
+      return res.status(401).json({ error: "Connection timed out" });
     }
 
     const jobsCollection = userDbConnection.collection("jobs");
+    const customersDataCollection = userDbConnection.collection("customer_phones");
 
     const newJob = req.body;
 
-    const lastJob = await jobsCollection.findOne(
-      {},
-      { sort: { job_no: -1 } }
-    );
+    // Generate job number
+    const lastJob = await jobsCollection.findOne({}, { sort: { job_no: -1 } });
     const nextJobNo = lastJob ? lastJob.job_no + 1 : 1;
 
     newJob.job_no = nextJobNo;
     newJob.createdAt = new Date();
 
+    // Save jobcard first (main operation)
     await jobsCollection.insertOne(newJob);
 
+    // Send response immediately (non-blocking)
     res.json({
       success: true,
       message: "Job saved successfully",
       job_no: nextJobNo,
     });
+
+    // 🔄 Run customer phone save in background (async)
+    const { customer_name, customer_phone } = newJob;
+    if (customer_phone && customer_name) {
+      // no await here — fire-and-forget
+      (async () => {
+        try {
+          await customersDataCollection.updateOne(
+            { customer_phone : customer_phone },
+            { $set: { customer_name: customer_name } },
+            { upsert: true }
+          );
+        } catch (err) {
+          console.error("Async customer save failed:", err);
+        }
+      })();
+    }
+
   } catch (err) {
     console.error("Error saving job:", err);
     res.status(500).json({ success: false, message: "Failed to save job" });
