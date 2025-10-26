@@ -3,6 +3,7 @@ import "./settings.css";
 import api from "../axiosConfig";
 import { useNavigate } from "react-router-dom";
 import { FaPen, FaPlus, FaTrash, FaEdit } from "react-icons/fa";
+import Navbar from "../Navbar/Navbar";
 
 const Settings = () => {
     const [name, setName] = useState("");
@@ -267,183 +268,186 @@ const Settings = () => {
     };
 
     return (
-        <div className="settings-container">
-            <div className="settings-content">
-                {/* Personal Info Section */}
-                <div className="settings-section">
-                    <h2>Personal Information</h2>
-                    <hr />
-                    <form onSubmit={handleNameChange} className="settings-form">
-                        <label>Change Name</label>
-                        <div className="input-with-icon">
-                            <input
-                                type="text"
-                                placeholder="Enter new name"
-                                value={name}
-                                disabled={!isEditingName}
-                                onChange={(e) => setName(e.target.value)}
-                                className="light-input"
-                            />
-                            <button
-                                type="button"
-                                className="edit-btn"
-                                onClick={() => setIsEditingName(true)}
-                            >
-                                <FaPen />
-                            </button>
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={name === originalName}
-                            className="update-btn"
-                        >
-                            Update Name
-                        </button>
-                    </form>
-
-                    {/* Change Password Section */}
-                    <div className="settings-form">
-                        <label>Change Password</label>
-
-                        <form onSubmit={handleVerifyPassword} className="settings-form">
-                            <input
-                                type="password"
-                                placeholder="Enter current password"
-                                value={currentPassword}
-                                disabled={isVerified}
-                                onChange={(e) => setCurrentPassword(e.target.value)}
-                                className="light-input"
-                            />
-                            {!isVerified && (
-                                <button type="submit" className="update-btn">
-                                    Verify
+        <div style={{'margin':"0px"}}>
+            <Navbar />
+            <div className="settings-container">
+                <div className="settings-content">
+                    {/* Personal Info Section */}
+                    <div className="settings-section">
+                        <h2>Personal Information</h2>
+                        <hr />
+                        <form onSubmit={handleNameChange} className="settings-form">
+                            <label>Change Name</label>
+                            <div className="input-with-icon">
+                                <input
+                                    type="text"
+                                    placeholder="Enter new name"
+                                    value={name}
+                                    disabled={!isEditingName}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="light-input"
+                                />
+                                <button
+                                    type="button"
+                                    className="edit-btn"
+                                    onClick={() => setIsEditingName(true)}
+                                >
+                                    <FaPen />
                                 </button>
-                            )}
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={name === originalName}
+                                className="update-btn"
+                            >
+                                Update Name
+                            </button>
                         </form>
 
-                        {isVerified && (
-                            <form onSubmit={handlePasswordChange} className="settings-form">
+                        {/* Change Password Section */}
+                        <div className="settings-form">
+                            <label>Change Password</label>
+
+                            <form onSubmit={handleVerifyPassword} className="settings-form">
                                 <input
                                     type="password"
-                                    placeholder="Enter new password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Enter current password"
+                                    value={currentPassword}
+                                    disabled={isVerified}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
                                     className="light-input"
                                 />
-                                <input
-                                    type="password"
-                                    placeholder="Confirm new password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="light-input"
-                                />
-                                <button type="submit" className="update-btn">
-                                    Update Password
-                                </button>
+                                {!isVerified && (
+                                    <button type="submit" className="update-btn">
+                                        Verify
+                                    </button>
+                                )}
                             </form>
-                        )}
-                    </div>
-                </div>
 
-                {/* WhatsApp Messages Section */}
-                <div className="settings-section">
-                    <h2>WhatsApp Messages</h2>
-                    <hr />
-                    <div className="whatsapp-scroll">
-                        {messages.map((msg) => (
-                            <div key={msg._id} className="message-card">
-                                <h4>{msg.name}</h4>
-                                <p className="msg-preview">{msg.text.slice(0, 80)}...</p>
-                                <div className="msg-actions">
-                                    <button className="icon-btn" onClick={() => openEditModal(msg)}>
-                                        <FaEdit />
+                            {isVerified && (
+                                <form onSubmit={handlePasswordChange} className="settings-form">
+                                    <input
+                                        type="password"
+                                        placeholder="Enter new password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="light-input"
+                                    />
+                                    <input
+                                        type="password"
+                                        placeholder="Confirm new password"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        className="light-input"
+                                    />
+                                    <button type="submit" className="update-btn">
+                                        Update Password
                                     </button>
-                                    <button
-                                        className="icon-btn delete-btn"
-                                        onClick={() => handleDeleteMessage(msg._id)}
-                                    >
-                                        <FaTrash />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                        <div
-                            className="message-card create-card"
-                            onClick={() => setShowModal(true)}
-                        >
-                            <FaPlus size={24} />
-                            <span>Create</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Modal for create/edit */}
-            {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content modal-grid">
-                        {/* Left half - Message Editor */}
-                        <div className="modal-left">
-                            <h3>{editingMessageId ? "Edit Message" : "Create New Message"}</h3>
-
-                            <label>Message Name</label>
-                            <input
-                                type="text"
-                                value={messageName}
-                                onChange={(e) => setMessageName(e.target.value)}
-                                className="light-input"
-                            />
-
-                            <label>Message Content</label>
-                            <textarea
-                                ref={customTextRef} // 👈 add ref
-                                rows="7"
-                                value={customText.replace(/\\n/g, "\n")}
-                                onChange={(e) => setCustomText(e.target.value)}
-                                className="light-input"
-                                placeholder="Type your message or insert fields..."
-                            />
-
-                            {/* Live Preview */}
-                            <div className="preview-section">
-                                <h4>Message Preview</h4>
-                                <div className="preview-box">
-                                    <pre>{customText.replace(/\\n/g, "\n")}</pre>
-                                </div>
-                            </div>
-
-                            <div className="modal-actions">
-                                <button className="update-btn" onClick={handleSaveMessage}>
-                                    Save
-                                </button>
-                                <button className="cancel-btn" onClick={() => setShowModal(false)}>
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Right half - Schema Fields */}
-                        <div className="modal-right">
-                            <h4>Available Fields</h4>
-                            {jobCardSchema ? (
-                                <div className="field-list">
-                                    {getRelevantFields(jobCardSchema).map((f) => (
-                                        <button
-                                            key={f.key}
-                                            className="field-btn"
-                                            onClick={() => insertField(f.key)}
-                                        >
-                                            {f.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p>Loading schema...</p>
+                                </form>
                             )}
                         </div>
                     </div>
+
+                    {/* WhatsApp Messages Section */}
+                    <div className="settings-section">
+                        <h2>WhatsApp Messages</h2>
+                        <hr />
+                        <div className="whatsapp-scroll">
+                            {messages.map((msg) => (
+                                <div key={msg._id} className="message-card">
+                                    <h4>{msg.name}</h4>
+                                    <p className="msg-preview">{msg.text.slice(0, 80)}...</p>
+                                    <div className="msg-actions">
+                                        <button className="icon-btn" onClick={() => openEditModal(msg)}>
+                                            <FaEdit />
+                                        </button>
+                                        <button
+                                            className="icon-btn delete-btn"
+                                            onClick={() => handleDeleteMessage(msg._id)}
+                                        >
+                                            <FaTrash />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            <div
+                                className="message-card create-card"
+                                onClick={() => setShowModal(true)}
+                            >
+                                <FaPlus size={24} />
+                                <span>Create</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            )}
+
+                {/* Modal for create/edit */}
+                {showModal && (
+                    <div className="modal-overlay">
+                        <div className="modal-content modal-grid">
+                            {/* Left half - Message Editor */}
+                            <div className="modal-left">
+                                <h3>{editingMessageId ? "Edit Message" : "Create New Message"}</h3>
+
+                                <label>Message Name</label>
+                                <input
+                                    type="text"
+                                    value={messageName}
+                                    onChange={(e) => setMessageName(e.target.value)}
+                                    className="light-input"
+                                />
+
+                                <label>Message Content</label>
+                                <textarea
+                                    ref={customTextRef} // 👈 add ref
+                                    rows="7"
+                                    value={customText.replace(/\\n/g, "\n")}
+                                    onChange={(e) => setCustomText(e.target.value)}
+                                    className="light-input"
+                                    placeholder="Type your message or insert fields..."
+                                />
+
+                                {/* Live Preview */}
+                                <div className="preview-section">
+                                    <h4>Message Preview</h4>
+                                    <div className="preview-box">
+                                        <pre>{customText.replace(/\\n/g, "\n")}</pre>
+                                    </div>
+                                </div>
+
+                                <div className="modal-actions">
+                                    <button className="update-btn" onClick={handleSaveMessage}>
+                                        Save
+                                    </button>
+                                    <button className="cancel-btn" onClick={() => setShowModal(false)}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Right half - Schema Fields */}
+                            <div className="modal-right">
+                                <h4>Available Fields</h4>
+                                {jobCardSchema ? (
+                                    <div className="field-list">
+                                        {getRelevantFields(jobCardSchema).map((f) => (
+                                            <button
+                                                key={f.key}
+                                                className="field-btn"
+                                                onClick={() => insertField(f.key)}
+                                            >
+                                                {f.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p>Loading schema...</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
