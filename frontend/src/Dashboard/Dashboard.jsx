@@ -83,15 +83,10 @@ export default function Dashboard() {
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("token");
-    navigate("/");
-  };
-
   return (
     <div className="dashboard-container">
       {/* Navbar */}
-      <Navbar onLogout={handleLogout} />
+      <Navbar />
 
       {/* Job Summary + Create Button */}
       <div className="job-summary-section">

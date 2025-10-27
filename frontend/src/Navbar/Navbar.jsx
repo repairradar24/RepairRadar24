@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import SettingsIcon from "@mui/icons-material/Settings";
 import "./navbar.css";
 
-export default function Navbar({ onLogout }) {
+export default function Navbar() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
 
@@ -11,6 +11,11 @@ export default function Navbar({ onLogout }) {
     const storedName = sessionStorage.getItem("userName");
     if (storedName) setUserName(storedName.toUpperCase());
   }, []);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("token");
+    navigate("/");
+  };
 
   return (
     <nav className="navbar">
@@ -25,7 +30,7 @@ export default function Navbar({ onLogout }) {
       </div>
 
       <div className="nav-section right">
-        <button onClick={onLogout} className="nav-btn">
+        <button onClick={handleLogout} className="nav-btn">
           Logout
         </button>
         <button
