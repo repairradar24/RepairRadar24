@@ -158,6 +158,31 @@ router.get("/jobs/list", authenticateAndGetUserDb, async (req, res) => {
   }
 });
 
+const upsertCustomerInBackground = async (
+  customersDataCollection,
+  customer_phone,
+  customer_name
+) => {
+  // Only run if we have both pieces of data
+  if (customer_phone && customer_name) {
+    try {
+      await customersDataCollection.updateOne(
+        { customer_phone: customer_phone },
+        { $set: { customer_name: customer_name } },
+        { upsert: true }
+      );
+      // Optional: Log success if needed
+      // console.log(`Async customer save success for: ${customer_phone}`);
+    } catch (err) {
+      // We must catch errors here, otherwise it's an unhandled promise rejection
+      console.error(
+        `Async customer save/update failed for ${customer_phone}:`,
+        err
+      );
+    }
+  }
+};
+
 router.post("/jobs/savejobcard", authenticateAndGetUserDb, async (req, res) => {
   try {
     const userDbConnection = await getUserDb(req.token);
@@ -188,22 +213,12 @@ router.post("/jobs/savejobcard", authenticateAndGetUserDb, async (req, res) => {
       job_no: nextJobNo,
     });
 
-    // 🔄 Run customer phone save in background (async)
-    const { customer_name, customer_phone } = newJob;
-    if (customer_phone && customer_name) {
-      // no await here — fire-and-forget
-      (async () => {
-        try {
-          await customersDataCollection.updateOne(
-            { customer_phone : customer_phone },
-            { $set: { customer_name: customer_name } },
-            { upsert: true }
-          );
-        } catch (err) {
-          console.error("Async customer save failed:", err);
-        }
-      })();
-    }
+    // 🔄 Call the new non-blocking function
+    upsertCustomerInBackground(
+      customersDataCollection,
+      newJob.customer_phone,
+      newJob.customer_name
+    );
 
   } catch (err) {
     console.error("Error saving job:", err);
@@ -228,27 +243,42 @@ router.get("/jobs/getjobcard/:id", authenticateAndGetUserDb, async (req, res) =>
   }
 });
 
-router.put("/jobs/updatejobcard/:id", authenticateAndGetUserDb, async (req, res) => {
-  try {
-    const userDbConnection = await getUserDb(req.token);
-    if (!userDbConnection) return res.status(401).json({ error: "Connection timed out" });
+router.put("/jobs/updatejobcard/:id",authenticateAndGetUserDb, async (req, res) => {
+    try {
+      const userDbConnection = await getUserDb(req.token);
+      if (!userDbConnection)
+        return res.status(401).json({ error: "Connection timed out" });
 
-    const jobsCollection = userDbConnection.collection("jobs");
-    const { _id, job_no, ...updates } = req.body; // prevent changing job_no
+      const jobsCollection = userDbConnection.collection("jobs");
+      const customersDataCollection =
+        userDbConnection.collection("customer_phones"); // 👈 Get collection
 
-    const result = await jobsCollection.updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: updates }
-    );
+      const { _id, job_no, ...updates } = req.body; // prevent changing job_no
 
-    if (result.matchedCount === 0) return res.status(404).json({ error: "Job not found" });
+      const result = await jobsCollection.updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: updates }
+      );
 
-    res.json({ success: true, message: "Job updated successfully" });
-  } catch (err) {
-    console.error("Error updating job:", err);
-    res.status(500).json({ error: "Failed to update job" });
+      if (result.matchedCount === 0)
+        return res.status(404).json({ error: "Job not found" });
+
+      // Send response immediately
+      res.json({ success: true, message: "Job updated successfully" });
+
+      // 🔄 Call the new non-blocking function
+      upsertCustomerInBackground(
+        customersDataCollection,
+        updates.customer_phone,
+        updates.customer_name
+      );
+      
+    } catch (err) {
+      console.error("Error updating job:", err);
+      res.status(500).json({ error: "Failed to update job" });
+    }
   }
-});
+);
 
 router.get("/whatsapp/get-messages", authenticateAndGetUserDb, async (req, res) => {
   try {
@@ -364,33 +394,33 @@ router.get("/customerdetails", authenticateAndGetUserDb, async (req, res) => {
 });
 
 router.delete("/customerdetails/:id", authenticateAndGetUserDb, async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-        // 1. Validate the ID format before proceeding
-        if (!ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: "Invalid ID format" });
-        }
-
-        // 2. Get the user-specific database
-        const userDb = await getUserDb(req.token);
-        const deleteId = new ObjectId(id);
-
-        // 3. Perform the delete operation
-        const result = await userDb.collection("customer_phones").deleteOne({ _id: deleteId });
-
-        // 4. Check if a document was actually deleted
-        if (result.deletedCount === 0) {
-            return res.status(404).json({ success: false, message: "Customer not found" });
-        }
-
-        // 5. Send success response
-        res.status(200).json({ success: true, message: "Customer deleted successfully" });
-    
-    } catch (err) {
-        console.error("Error deleting customer:", err);
-        res.status(500).json({ success: false, message: "Failed to delete customer" });
+    // 1. Validate the ID format before proceeding
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid ID format" });
     }
+
+    // 2. Get the user-specific database
+    const userDb = await getUserDb(req.token);
+    const deleteId = new ObjectId(id);
+
+    // 3. Perform the delete operation
+    const result = await userDb.collection("customer_phones").deleteOne({ _id: deleteId });
+
+    // 4. Check if a document was actually deleted
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "Customer not found" });
+    }
+
+    // 5. Send success response
+    res.status(200).json({ success: true, message: "Customer deleted successfully" });
+
+  } catch (err) {
+    console.error("Error deleting customer:", err);
+    res.status(500).json({ success: false, message: "Failed to delete customer" });
+  }
 });
 
 module.exports = router;
