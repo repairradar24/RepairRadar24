@@ -91,6 +91,15 @@ export default function CreateJobCard() {
         }
       })
       .catch((err) => console.error("Failed to load items:", err));
+
+    api.get("/user/parts", { headers: { authorization: `Bearer ${token}` } })
+      .then((res) => {
+        if (res.data.success) {
+          setSavedParts(res.data.parts);
+        }
+      })
+      .catch((err) => console.error("Failed to load parts:", err));
+
   }, [navigate]);
 
   const handleChange = (key, value) => {
@@ -434,7 +443,7 @@ export default function CreateJobCard() {
                               {sub.key === "item_name" ? (
                                 <Autocomplete
                                   freeSolo // Allows typing new values
-                                  options={savedItems.map((i)=>i.item_name)} // Use the item list from state
+                                  options={savedItems.map((i) => i.item_name)} // Use the item list from state
                                   value={row[sub.key] || ""}
                                   onInputChange={(_, newValue) => {
                                     // Update state when user types or selects
@@ -529,26 +538,41 @@ export default function CreateJobCard() {
                       (p, idx) => (
                         <TableRow key={idx}>
                           <TableCell>
-                            <TextField
+                            <Autocomplete
+                              freeSolo
+                              options={savedParts.map((part) => part.part_name)}
                               value={p.name || ""}
-                              onChange={(e) => {
+                              onInputChange={(_, newValue) => {
+                                const newPartName = newValue || "";
+
+                                const foundPart = savedParts.find(
+                                  (sp) => sp.part_name === newPartName
+                                );
+
                                 const updated = [...formData[activeParts.parentKey]];
-                                updated[activeParts.rowIndex].parts[idx] = {
-                                  ...p,
-                                  name: e.target.value,
-                                };
+                                const currentPart = updated[activeParts.rowIndex].parts[idx];
+
+                                currentPart.name = newPartName;
+
+                                if (foundPart) {
+                                  currentPart.price = foundPart.part_price;
+                                }
+
                                 setFormData((prev) => ({
                                   ...prev,
                                   [activeParts.parentKey]: updated,
                                 }));
                               }}
-                              size="small"
+                              renderInput={(params) => (
+                                <TextField {...params} size="small" label="Part Name" />
+                              )}
                             />
                           </TableCell>
+
                           <TableCell>
                             <TextField
                               type="number"
-                              value={p.qty === "" || p.qty === undefined ? "" : p.qty}
+                              value={p.qty ?? ""}
                               onChange={(e) => {
                                 const updated = [...formData[activeParts.parentKey]];
                                 updated[activeParts.rowIndex].parts[idx] = {
@@ -563,14 +587,11 @@ export default function CreateJobCard() {
                               size="small"
                             />
                           </TableCell>
+
                           <TableCell>
                             <TextField
                               type="number"
-                              value={
-                                p.price === "" || p.price === undefined || p.price === null
-                                  ? ""
-                                  : p.price
-                              }
+                              value={p.price ?? ""}
                               onChange={(e) => {
                                 const updated = [...formData[activeParts.parentKey]];
                                 updated[activeParts.rowIndex].parts[idx] = {
@@ -585,6 +606,7 @@ export default function CreateJobCard() {
                               size="small"
                             />
                           </TableCell>
+
                           <TableCell>
                             <IconButton
                               color="error"
@@ -605,6 +627,7 @@ export default function CreateJobCard() {
                       )
                     )}
                   </TableBody>
+
                 </Table>
               </Paper>
               {partsErrors && <span className="error-text">{partsErrors}</span>}

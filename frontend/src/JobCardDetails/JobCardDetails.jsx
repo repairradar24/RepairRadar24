@@ -37,6 +37,7 @@ export default function JobCardDetails() {
   const [whatsappMessages, setWhatsappMessages] = useState([]);
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [savedItems, setSavedItems] = useState([]);
+  const [savedParts, setSavedParts] = useState([]);
 
   // ✅ Fetch schema + job data
   useEffect(() => {
@@ -50,15 +51,17 @@ export default function JobCardDetails() {
     Promise.all([
       api.get("/user/get-config", { headers: { authorization: `Bearer ${token}` } }),
       api.get(`/user/jobs/getjobcard/${id}`, { headers: { authorization: `Bearer ${token}` } }),
-      api.get("/user/items", { headers: { authorization: `Bearer ${token}` } })
+      api.get("/user/items", { headers: { authorization: `Bearer ${token}` } }),
+      api.get("/user/parts", { headers: { authorization: `Bearer ${token}` } })
     ])
-      .then(([schemaRes, jobRes, itemRes]) => {
+      .then(([schemaRes, jobRes, itemRes, partsRes]) => {
         if (schemaRes.data?.schema) {
           console.log("Schema fetched:", schemaRes.data.schema);
           setSchema(schemaRes.data.schema);
         }
         if (jobRes.data?.job) setFormData(jobRes.data.job);
         if (itemRes?.data?.items) setSavedItems(itemRes.data.items);
+        if (partsRes?.data?.parts) setSavedParts(partsRes.data.parts);
       })
       .catch((err) => {
         console.error("Error loading job details:", err);
@@ -631,29 +634,51 @@ export default function JobCardDetails() {
                       <TableCell>Action</TableCell>
                     </TableRow>
                   </TableHead>
+                  
                   <TableBody>
                     {(formData[activeParts.parentKey]?.[activeParts.rowIndex].parts || []).map(
                       (p, idx) => (
                         <TableRow key={idx}>
+                          {/* Part Name */}
                           <TableCell>
-                            <TextField
+                            <Autocomplete
+                              freeSolo
+                              options={savedParts.map((part) => part.part_name)}
                               value={p.name || ""}
-                              onChange={(e) => {
+                              onInputChange={(_, newValue) => {
+                                const newPartName = newValue || "";
+
+                                const foundPart = savedParts.find(
+                                  (sp) => sp.part_name === newPartName
+                                );
+
                                 const updated = [...formData[activeParts.parentKey]];
-                                updated[activeParts.rowIndex].parts[idx] = {
-                                  ...p,
-                                  name: e.target.value,
-                                };
+                                const currentPart = updated[activeParts.rowIndex].parts[idx];
+
+                                currentPart.name = newPartName;
+
+                                if (foundPart) {
+                                  currentPart.price = foundPart.part_price;
+                                }
+
                                 setFormData((prev) => ({
                                   ...prev,
                                   [activeParts.parentKey]: updated,
                                 }));
                               }}
-                              size="small"
-                              error={!!errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
-                              helperText={errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  size="small"
+                                  label="Part Name"
+                                  error={!!errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
+                                  helperText={errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
+                                />
+                              )}
                             />
                           </TableCell>
+
+                          {/* Qty */}
                           <TableCell>
                             <TextField
                               type="number"
@@ -672,10 +697,12 @@ export default function JobCardDetails() {
                               size="small"
                             />
                           </TableCell>
+
+                          {/* Price */}
                           <TableCell>
                             <TextField
                               type="number"
-                              value={p.price}
+                              value={p.price == null ? "" : p.price}
                               onChange={(e) => {
                                 const updated = [...formData[activeParts.parentKey]];
                                 updated[activeParts.rowIndex].parts[idx] = {
@@ -690,6 +717,8 @@ export default function JobCardDetails() {
                               size="small"
                             />
                           </TableCell>
+
+                          {/* Delete */}
                           <TableCell>
                             <IconButton
                               color="error"
@@ -697,6 +726,7 @@ export default function JobCardDetails() {
                                 const updated = [...formData[activeParts.parentKey]];
                                 updated[activeParts.rowIndex].parts =
                                   updated[activeParts.rowIndex].parts.filter((_, i) => i !== idx);
+
                                 setFormData((prev) => ({
                                   ...prev,
                                   [activeParts.parentKey]: updated,
@@ -706,10 +736,12 @@ export default function JobCardDetails() {
                               <Delete />
                             </IconButton>
                           </TableCell>
+
                         </TableRow>
                       )
                     )}
                   </TableBody>
+
                 </Table>
               </Paper>
               {partsErrors && <span className="error-text">{partsErrors}</span>}
