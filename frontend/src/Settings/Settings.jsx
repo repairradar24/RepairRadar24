@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import "./settings.css";
 import api from "../axiosConfig";
 import { useNavigate } from "react-router-dom";
-import { FaPen, FaPlus, FaTrash, FaEdit } from "react-icons/fa";
+import { FaPen, FaPlus, FaTrash, FaEdit, FaSave } from "react-icons/fa"; // Added FaSave
 import Navbar from "../Navbar/Navbar";
 
 const Settings = () => {
@@ -31,9 +31,15 @@ const Settings = () => {
     // Customer Details
     const [customers, setCustomers] = useState([]);
 
-    // 👈 NEW: Saved Items
-    const [itemName, setItemName] = useState(""); 
-    const [savedItems, setSavedItems] = useState([]); 
+    // Saved Items
+    const [itemName, setItemName] = useState("");
+    const [savedItems, setSavedItems] = useState([]);
+
+    // 🚀 NEW: Saved Parts
+    const [partName, setPartName] = useState("");
+    const [partPrice, setPartPrice] = useState("");
+    const [savedParts, setSavedParts] = useState([]);
+    const [editingPartId, setEditingPartId] = useState(null);
 
     const navigate = useNavigate();
 
@@ -54,7 +60,8 @@ const Settings = () => {
         fetchMessages();
         fetchSchema();
         fetchCustomers();
-        fetchSavedItems(); // 👈 NEW: Fetch saved items on load
+        fetchSavedItems();
+        fetchSavedParts(); // 🚀 NEW: Fetch parts on load
     }, [navigate]);
 
     const fetchMessages = async () => {
@@ -89,11 +96,9 @@ const Settings = () => {
         }
     };
 
-    // 👈 NEW: Function to fetch saved items
     const fetchSavedItems = async () => {
         try {
             const token = sessionStorage.getItem("token");
-            // Assuming a new route /user/items
             const res = await api.get("/user/items", {
                 headers: { authorization: `Bearer ${token}` },
             });
@@ -107,7 +112,23 @@ const Settings = () => {
         }
     };
 
-    // 👈 NEW: Function to add a new item
+    // 🚀 NEW: Function to fetch saved parts
+    const fetchSavedParts = async () => {
+        try {
+            const token = sessionStorage.getItem("token");
+            const res = await api.get("/user/parts", {
+                headers: { authorization: `Bearer ${token}` },
+            });
+            if (res.data.success) {
+                setSavedParts(res.data.parts || []);
+            } else {
+                console.error("Failed to fetch parts:", res.data.message);
+            }
+        } catch (err) {
+            console.error("Error fetching parts:", err);
+        }
+    };
+
     const handleAddItem = async (e) => {
         e.preventDefault();
         const trimmedItemName = itemName.trim();
@@ -119,15 +140,13 @@ const Settings = () => {
         try {
             const token = sessionStorage.getItem("token");
             const payload = { item_name: trimmedItemName };
-            
-            // Assuming POST /user/items
+
             const res = await api.post("/user/items", payload, {
                 headers: { authorization: `Bearer ${token}` },
             });
 
             if (res.data.success) {
                 alert("Item added successfully.");
-                // Add the new item to local state (assuming backend returns the new item)
                 setSavedItems([...savedItems, res.data.item]);
                 setItemName(""); // Clear the input
             } else {
@@ -139,20 +158,17 @@ const Settings = () => {
         }
     };
 
-    // 👈 NEW: Function to delete a saved item
     const handleDeleteItem = async (id) => {
         if (!window.confirm("Are you sure you want to delete this item?")) return;
 
         try {
             const token = sessionStorage.getItem("token");
-            // Assuming DELETE /user/items/:id
             const res = await api.delete(`/user/items/${id}`, {
                 headers: { authorization: `Bearer ${token}` },
             });
 
             if (res.status === 200) {
                 alert("Item deleted successfully.");
-                // Update state locally
                 setSavedItems(prevItems =>
                     prevItems.filter(item => item._id !== id)
                 );
@@ -162,6 +178,103 @@ const Settings = () => {
         } catch (err) {
             console.error("Error deleting item:", err);
             alert(err.response?.data?.message || "Failed to delete item.");
+        }
+    };
+
+    // 🚀 NEW: Function to clear the part form
+    const clearPartForm = () => {
+        setPartName("");
+        setPartPrice("");
+        setEditingPartId(null);
+    };
+
+    // 🚀 NEW: Function to handle saving or updating a part
+    const handleSavePart = async (e) => {
+        e.preventDefault();
+        const trimmedPartName = partName.trim();
+        const price = parseFloat(partPrice);
+
+        if (!trimmedPartName) {
+            alert("Please enter a part name.");
+            return;
+        }
+        if (isNaN(price) || price < 0) {
+            alert("Please enter a valid price.");
+            return;
+        }
+
+        const payload = { part_name: trimmedPartName, part_price: price };
+        const token = sessionStorage.getItem("token");
+
+        try {
+            let res;
+            if (editingPartId) {
+                // Update existing part
+                res = await api.put(`/user/parts/${editingPartId}`, payload, {
+                    headers: { authorization: `Bearer ${token}` },
+                });
+                if (res.data.success) {
+                    alert("Part updated successfully.");
+                    setSavedParts(savedParts.map(p =>
+                        p._id === editingPartId ? res.data.part : p
+                    ));
+                }
+            } else {
+                // Add new part
+                res = await api.post("/user/parts", payload, {
+                    headers: { authorization: `Bearer ${token}` },
+                });
+                if (res.data.success) {
+                    alert("Part added successfully.");
+                    setSavedParts([...savedParts, res.data.part]);
+                }
+            }
+
+            if (res.data.success) {
+                clearPartForm();
+            } else {
+                alert(res.data.message || "Failed to save part.");
+            }
+        } catch (err) {
+            console.error("Error saving part:", err);
+            if (err.response?.status === 401) {
+                alert("Session expired. Please log in again.");
+                navigate("/");
+                return;
+            }
+            alert(err.response?.data?.message || "Failed to save part.");
+        }
+    };
+
+    // 🚀 NEW: Function to populate form for editing
+    const handleEditPart = (part) => {
+        setEditingPartId(part._id);
+        setPartName(part.part_name);
+        setPartPrice(part.part_price);
+        window.scrollTo(0, 0); // Scroll to top to see the form
+    };
+
+    // 🚀 NEW: Function to delete a saved part
+    const handleDeletePart = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this part?")) return;
+
+        try {
+            const token = sessionStorage.getItem("token");
+            const res = await api.delete(`/user/parts/${id}`, {
+                headers: { authorization: `Bearer ${token}` },
+            });
+
+            if (res.status === 200) {
+                alert("Part deleted successfully.");
+                setSavedParts(prevParts =>
+                    prevParts.filter(part => part._id !== id)
+                );
+            } else {
+                alert(res.data.message || "Failed to delete part.");
+            }
+        } catch (err) {
+            console.error("Error deleting part:", err);
+            alert(err.response?.data?.message || "Failed to delete part.");
         }
     };
 
@@ -190,6 +303,7 @@ const Settings = () => {
     };
 
     const fetchSchema = async () => {
+        // ... (function unchanged)
         try {
             const token = sessionStorage.getItem("token");
             const res = await api.get("/user/get-config", {
@@ -197,7 +311,7 @@ const Settings = () => {
             });
             setJobCardSchema(res.data);
         } catch (err) {
-            if (err.status === 401) {
+            if (err.response?.status === 401) { // Corrected err.status to err.response.status
                 alert("Session expired. Please log in again.");
                 navigate("/");
             }
@@ -425,12 +539,18 @@ const Settings = () => {
                     >
                         Customer Details
                     </button>
-                    {/* 👈 NEW: Saved Items Tab Button */}
                     <button
                         className={`tab-btn ${activeTab === "saveditems" ? "active" : ""}`}
                         onClick={() => setActiveTab("saveditems")}
                     >
                         Saved Items
+                    </button>
+                    {/* 🚀 NEW: Saved Parts Tab Button */}
+                    <button
+                        className={`tab-btn ${activeTab === "savedparts" ? "active" : ""}`}
+                        onClick={() => setActiveTab("savedparts")}
+                    >
+                        Saved Parts
                     </button>
                 </div>
 
@@ -438,7 +558,7 @@ const Settings = () => {
                 <div className="settings-right">
                     {activeTab === "personal" && (
                         <>
-                           {/* ... (personal info content unchanged) ... */}
+                            {/* ... (personal info content unchanged) ... */}
                             <h2>Personal Information</h2>
                             <hr />
                             <form onSubmit={handleNameChange} className="settings-form">
@@ -514,7 +634,7 @@ const Settings = () => {
 
                     {activeTab === "whatsapp" && (
                         <>
-                           {/* ... (whatsapp content unchanged) ... */}
+                            {/* ... (whatsapp content unchanged) ... */}
                             <h2>WhatsApp Messages</h2>
                             <hr />
                             <div className="whatsapp-scroll">
@@ -589,13 +709,12 @@ const Settings = () => {
                         </>
                     )}
 
-                    {/* 👈 NEW: Saved Items Tab Content */}
                     {activeTab === "saveditems" && (
                         <>
+                            {/* ... (saved items content unchanged) ... */}
                             <h2>Saved Items</h2>
                             <hr />
 
-                            {/* Add Item Form */}
                             <form onSubmit={handleAddItem} className="settings-form saved-item-form">
                                 <label>Add New Item</label>
                                 <div className="input-with-button">
@@ -612,7 +731,6 @@ const Settings = () => {
                                 </div>
                             </form>
 
-                            {/* List of Saved Items */}
                             <div className="saved-items-list-container">
                                 <h4>Existing Items</h4>
                                 {savedItems.length > 0 ? (
@@ -634,6 +752,90 @@ const Settings = () => {
                                         No saved items found.
                                     </p>
                                 )}
+                            </div>
+                        </>
+                    )}
+
+                    {/* 🚀 NEW: Saved Parts Tab Content */}
+                    {activeTab === "savedparts" && (
+                        <>
+                            <h2>Saved Parts</h2>
+                            <hr />
+
+                            {/* Add/Edit Part Form */}
+                            <form onSubmit={handleSavePart} className="settings-form saved-item-form">
+                                <label>{editingPartId ? "Edit Part" : "Add New Part"}</label>
+                                <div className="input-with-button">
+                                    <input
+                                        type="text"
+                                        placeholder="Enter part name"
+                                        value={partName}
+                                        onChange={(e) => setPartName(e.target.value)}
+                                        className="light-input"
+                                        style={{ flex: 2 }} // Give more space
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Enter price"
+                                        value={partPrice}
+                                        onChange={(e) => setPartPrice(e.target.value)}
+                                        className="light-input"
+                                        style={{ flex: 1 }} // Give less space
+                                    />
+                                    <button type="submit" className="add-btn">
+                                        {editingPartId ? <FaSave /> : <FaPlus />}
+                                        {editingPartId ? " Update" : " Save"}
+                                    </button>
+                                    {editingPartId && (
+                                        <button type="button" className="cancel-btn" onClick={clearPartForm}>
+                                            Cancel
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
+
+                            {/* List of Saved Parts */}
+                            <div className="customer-table-container" style={{ marginTop: '30px' }}>
+                                <h4>Existing Parts</h4>
+                                <table className="customer-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Part Name</th>
+                                            <th>Part Price</th>
+                                            <th style={{ width: '100px' }}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {savedParts.length > 0 ? (
+                                            savedParts.map((part) => (
+                                                <tr key={part._id}>
+                                                    <td>{part.part_name}</td>
+                                                    <td>₹{part.part_price.toFixed(2)}</td>
+                                                    <td>
+                                                        <button
+                                                            className="icon-btn"
+                                                            onClick={() => handleEditPart(part)}
+                                                        >
+                                                            <FaEdit />
+                                                        </button>
+                                                        <button
+                                                            className="icon-btn delete-btn"
+                                                            onClick={() => handleDeletePart(part._id)}
+                                                        >
+                                                            <FaTrash />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="3" style={{ textAlign: "center" }}>
+                                                    No saved parts found.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         </>
                     )}
@@ -677,7 +879,12 @@ const Settings = () => {
                                 <button className="update-btn" onClick={handleSaveMessage}>
                                     Save
                                 </button>
-                                <button className="cancel-btn" onClick={() => setShowModal(false)}>
+                                <button className="cancel-btn" onClick={() => {
+                                    setShowModal(false);
+                                    setEditingMessageId(null);
+                                    setMessageName("");
+                                    setCustomText("");
+                                }}>
                                     Cancel
                                 </button>
                             </div>

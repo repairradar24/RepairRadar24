@@ -243,41 +243,41 @@ router.get("/jobs/getjobcard/:id", authenticateAndGetUserDb, async (req, res) =>
   }
 });
 
-router.put("/jobs/updatejobcard/:id",authenticateAndGetUserDb, async (req, res) => {
-    try {
-      const userDbConnection = await getUserDb(req.token);
-      if (!userDbConnection)
-        return res.status(401).json({ error: "Connection timed out" });
+router.put("/jobs/updatejobcard/:id", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDbConnection = await getUserDb(req.token);
+    if (!userDbConnection)
+      return res.status(401).json({ error: "Connection timed out" });
 
-      const jobsCollection = userDbConnection.collection("jobs");
-      const customersDataCollection =
-        userDbConnection.collection("customer_phones"); // 👈 Get collection
+    const jobsCollection = userDbConnection.collection("jobs");
+    const customersDataCollection =
+      userDbConnection.collection("customer_phones"); // 👈 Get collection
 
-      const { _id, job_no, ...updates } = req.body; // prevent changing job_no
+    const { _id, job_no, ...updates } = req.body; // prevent changing job_no
 
-      const result = await jobsCollection.updateOne(
-        { _id: new ObjectId(req.params.id) },
-        { $set: updates }
-      );
+    const result = await jobsCollection.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: updates }
+    );
 
-      if (result.matchedCount === 0)
-        return res.status(404).json({ error: "Job not found" });
+    if (result.matchedCount === 0)
+      return res.status(404).json({ error: "Job not found" });
 
-      // Send response immediately
-      res.json({ success: true, message: "Job updated successfully" });
+    // Send response immediately
+    res.json({ success: true, message: "Job updated successfully" });
 
-      // 🔄 Call the new non-blocking function
-      upsertCustomerInBackground(
-        customersDataCollection,
-        updates.customer_phone,
-        updates.customer_name
-      );
+    // 🔄 Call the new non-blocking function
+    upsertCustomerInBackground(
+      customersDataCollection,
+      updates.customer_phone,
+      updates.customer_name
+    );
 
-    } catch (err) {
-      console.error("Error updating job:", err);
-      res.status(500).json({ error: "Failed to update job" });
-    }
+  } catch (err) {
+    console.error("Error updating job:", err);
+    res.status(500).json({ error: "Failed to update job" });
   }
+}
 );
 
 router.get("/whatsapp/get-messages", authenticateAndGetUserDb, async (req, res) => {
@@ -382,6 +382,7 @@ router.delete("/whatsapp/delete-message/:id", authenticateAndGetUserDb, async (r
 router.get("/customerdetails", authenticateAndGetUserDb, async (req, res) => {
   try {
     const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
     const customers = await userDb
       .collection("customer_phones")
       .find({})
@@ -404,6 +405,7 @@ router.delete("/customerdetails/:id", authenticateAndGetUserDb, async (req, res)
 
     // 2. Get the user-specific database
     const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
     const deleteId = new ObjectId(id);
 
     // 3. Perform the delete operation
@@ -424,62 +426,182 @@ router.delete("/customerdetails/:id", authenticateAndGetUserDb, async (req, res)
 });
 
 router.get("/items", authenticateAndGetUserDb, async (req, res) => {
-    try {
-        const userDb = await getUserDb(req.token);
-        const items = await userDb.collection("items").find({}).toArray();
-        res.json({ success: true, items });
-    } catch (err) {
-        console.error("Error fetching items:", err);
-        res.status(500).json({ success: false, message: "Failed to load items" });
-    }
+  try {
+    const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
+    const items = await userDb.collection("items").find({}).toArray();
+    res.json({ success: true, items });
+  } catch (err) {
+    console.error("Error fetching items:", err);
+    res.status(500).json({ success: false, message: "Failed to load items" });
+  }
 });
 
-// 👈 NEW: POST (add) a new saved item
 router.post("/items", authenticateAndGetUserDb, async (req, res) => {
-    try {
-        const { item_name } = req.body;
-        if (!item_name) {
-            return res.status(400).json({ success: false, message: "Item name is required" });
-        }
-        
-        const userDb = await getUserDb(req.token);
-        const newItem = { item_name: item_name.trim() };
-        
-        // Insert the new document
-        const result = await userDb.collection("items").insertOne(newItem);
-        
-        // Create the object to return to the frontend, including the new _id
-        const insertedItem = { _id: result.insertedId, ...newItem }; 
-
-        res.status(201).json({ success: true, message: "Item added", item: insertedItem });
-    
-    } catch (err) {
-        console.error("Error adding item:", err);
-        res.status(500).json({ success: false, message: "Failed to add item" });
+  try {
+    const { item_name } = req.body;
+    if (!item_name) {
+      return res.status(400).json({ success: false, message: "Item name is required" });
     }
+
+    const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
+    const newItem = { item_name: item_name.trim() };
+
+    // Insert the new document
+    const result = await userDb.collection("items").insertOne(newItem);
+
+    // Create the object to return to the frontend, including the new _id
+    const insertedItem = { _id: result.insertedId, ...newItem };
+
+    res.status(201).json({ success: true, message: "Item added", item: insertedItem });
+
+  } catch (err) {
+    console.error("Error adding item:", err);
+    res.status(500).json({ success: false, message: "Failed to add item" });
+  }
 });
 
-// 👈 NEW: DELETE a saved item
 router.delete("/items/:id", authenticateAndGetUserDb, async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (!ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: "Invalid ID format" });
-        }
-        
-        const userDb = await getUserDb(req.token);
-        const result = await userDb.collection("items").deleteOne({ _id: new ObjectId(id) });
-        
-        if (result.deletedCount === 0) {
-            return res.status(404).json({ success: false, message: "Item not found" });
-        }
-        
-        res.status(200).json({ success: true, message: "Item deleted" });
-    
-    } catch (err) {
-        console.error("Error deleting item:", err);
-        res.status(500).json({ success: false, message: "Failed to delete item" });
+  try {
+    const { id } = req.params;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid ID format" });
     }
+
+    const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
+    const result = await userDb.collection("items").deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
+
+    res.status(200).json({ success: true, message: "Item deleted" });
+
+  } catch (err) {
+    console.error("Error deleting item:", err);
+    res.status(500).json({ success: false, message: "Failed to delete item" });
+  }
+});
+
+router.get("/parts", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
+    const parts = await userDb.collection("parts").find({}).sort({ part_name: 1 }).toArray();
+    res.json({ success: true, parts });
+  } catch (err) {
+    console.error("Error fetching parts:", err);
+    res.status(500).json({ success: false, message: "Failed to load parts" });
+  }
+});
+
+router.post("/parts", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const { part_name, part_price } = req.body;
+    if (!part_name) {
+      return res.status(400).json({ success: false, message: "Part name is required" });
+    }
+    if (part_price === undefined || part_price === null || isNaN(parseFloat(part_price))) {
+      return res.status(400).json({ success: false, message: "A valid part price is required" });
+    }
+
+    const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
+
+    const existingPart = await userDb.collection("parts").findOne({ part_name });
+    if (existingPart) {
+      return res.status(400).json({ success: false, message: "A part with this name already exists" });
+    }
+
+    const newPart = {
+      part_name,
+      part_price: parseFloat(part_price),
+    };
+
+    const result = await userDb.collection("parts").insertOne(newPart);
+
+    const insertedPart = await userDb.collection("parts").findOne({ _id: result.insertedId });
+
+    res.status(201).json({ success: true, message: "Part added successfully", part: insertedPart });
+  } catch (err) {
+    console.error("Error adding part:", err);
+    res.status(500).json({ success: false, message: "Failed to add part" });
+  }
+});
+
+router.put("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { part_name, part_price } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid part ID" });
+    }
+
+    if (!part_name) {
+      return res.status(400).json({ success: false, message: "Part name is required" });
+    }
+    if (part_price === undefined || part_price === null || isNaN(parseFloat(part_price))) {
+      return res.status(400).json({ success: false, message: "A valid part price is required" });
+    }
+
+    const userDb = await getUserDb(req.token);
+
+    const existingPart = await userDb.collection("parts").findOne({
+      part_name,
+      _id: { $ne: new ObjectId(id) }
+    });
+    if (existingPart) {
+      return res.status(400).json({ success: false, message: "Another part with this name already exists" });
+    }
+
+    const updateData = {
+      $set: {
+        part_name,
+        part_price: parseFloat(part_price)
+      }
+    };
+
+    const result = await userDb.collection("parts").updateOne(
+      { _id: new ObjectId(id) },
+      updateData
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ success: false, message: "Part not found" });
+    }
+
+    const updatedPart = await userDb.collection("parts").findOne({ _id: new ObjectId(id) });
+
+    res.json({ success: true, message: "Part updated successfully", part: updatedPart });
+  } catch (err) {
+    console.error("Error updating part:", err);
+    res.status(500).json({ success: false, message: "Failed to update part" });
+  }
+});
+
+router.delete("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid part ID" });
+    }
+
+    const userDb = await getUserDb(req.token);
+    const result = await userDb.collection("parts").deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "Part not found" });
+    }
+
+    res.status(200).json({ success: true, message: "Part deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting part:", err);
+    res.status(500).json({ success: false, message: "Failed to delete part" });
+  }
 });
 
 module.exports = router;
