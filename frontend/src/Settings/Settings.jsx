@@ -2,8 +2,257 @@ import React, { useEffect, useState, useRef } from "react";
 import "./settings.css";
 import api from "../axiosConfig";
 import { useNavigate } from "react-router-dom";
-import { FaPen, FaPlus, FaTrash, FaEdit, FaSave } from "react-icons/fa"; // Added FaSave
+import { FaPen, FaPlus, FaTrash, FaEdit, FaSave } from "react-icons/fa";
 import Navbar from "../Navbar/Navbar";
+
+// --- HELPER COMPONENTS (STILL NEEDED) ---
+
+const generateKey = (name) => {
+  return name.trim().toLowerCase().replace(/\s+/g, "_");
+};
+
+// Recursive field configuration component
+const FieldConfig = ({ fields, setFields, level = 0 }) => {
+  const addField = () => {
+    const newField = {
+      name: "",
+      key: "",
+      type: "text",
+      options: [],
+      fields: [],
+      mandatory: false,
+    };
+    setFields([...fields, newField]);
+  };
+
+  const updateField = (index, key, value) => {
+    const updated = [...fields];
+    updated[index][key] = value;
+    if (key === "name") {
+      updated[index].key = generateKey(value);
+    }
+    setFields(updated);
+  };
+
+  const addOption = (index) => {
+    const updated = [...fields];
+    updated[index].options.push({ value: "", color: "#ffffff" });
+    setFields(updated);
+  };
+
+  const updateOption = (fieldIndex, optIndex, key, value) => {
+    const updated = [...fields];
+    updated[fieldIndex].options[optIndex][key] = value;
+    setFields(updated);
+  };
+
+  const removeOption = (fieldIndex, optIndex) => {
+    const updated = [...fields];
+    updated[fieldIndex].options.splice(optIndex, 1);
+    setFields(updated);
+  };
+
+  const removeField = (index) => {
+    const field = fields[index];
+    if (field.mandatory) {
+      alert(`The field "${field.name}" is mandatory and cannot be removed.`);
+      return;
+    }
+    setFields(fields.filter((_, i) => i !== index));
+  };
+
+  const moveField = (index, direction) => {
+    const updated = [...fields];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= fields.length) return;
+    [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+    setFields(updated);
+  };
+
+  return (
+    <div className={`field-group level-${level}`}>
+      {fields.map((field, index) => (
+        <div key={index} className="field-item">
+          <div className="field-row">
+            <input
+              type="text"
+              className="field-input"
+              placeholder="Field Name"
+              value={field.name}
+              onChange={(e) => updateField(index, "name", e.target.value)}
+              disabled={field.mandatory}
+            />
+            <span className="field-key">({field.key})</span>
+            <button
+              type="button"
+              className="move-btn"
+              onClick={() => moveField(index, -1)}
+              disabled={index === 0}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="move-btn"
+              onClick={() => moveField(index, 1)}
+              disabled={index === fields.length - 1}
+            >
+              ↓
+            </button>
+            {!field.mandatory && (
+              <button
+                type="button"
+                className="remove-btn"
+                onClick={() => removeField(index)}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {field.type === "dropdown" && (
+            <div className="options-section">
+              <button
+                type="button"
+                className="add-option-btn"
+                onClick={() => addOption(index)}
+              >
+                + Add Option
+              </button>
+              {field.options.map((opt, optIndex) => (
+                <div key={optIndex} className="option-row">
+                  <input
+                    type="text"
+                    className="option-input"
+                    placeholder={`Option ${optIndex + 1}`}
+                    value={opt.value}
+                    onChange={(e) =>
+                      updateOption(index, optIndex, "value", e.target.value)
+                    }
+                  />
+                  <label className="color-picker-label">
+                    🎨 Color:
+                    <input
+                      type="color"
+                      className="color-input"
+                      value={opt.color || "#cccccc"}
+                      onChange={(e) =>
+                        updateOption(index, optIndex, "color", e.target.value)
+                      }
+                      title="Click to select a color for this status"
+                    />
+                  </label>
+                  {field.key === "jobcard_status" && (
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={opt.displayByDefault || false}
+                        onChange={(e) =>
+                          updateOption(
+                            index,
+                            optIndex,
+                            "displayByDefault",
+                            e.target.checked
+                          )
+                        }
+                      />
+                      Display by Default
+                    </label>
+                  )}
+                  <button
+                    type="button"
+                    className="remove-option-btn"
+                    onClick={() => removeOption(index, optIndex)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {field.type === "list" && (
+            <div className="subfields-section">
+              <h5 className="subfields-title">Subfields for "{field.name}"</h5>
+              <FieldConfig
+                fields={field.fields}
+                setFields={(newSubfields) => {
+                  const updated = [...fields];
+                  updated[index].fields = newSubfields;
+                  setFields(updated);
+                }}
+                level={level + 1}
+              />
+            </div>
+          )}
+          {field.key === "jobcard_status" && (
+            <p className="status-hint">
+              ⚠️ This field decides which jobcards are shown on the dashboard.
+              Jobs with statuses marked as <b>Display by Default</b> will appear on load.
+            </p>
+          )}
+        </div>
+      ))}
+      <button type="button" className="add-field-btn" onClick={addField}>
+        + Add Field
+      </button>
+    </div>
+  );
+};
+
+// 🚀 FIX: defaultConfig is moved OUTSIDE the component to prevent re-creation
+const defaultConfig = [
+    { name: "Job Number", key: "job_no", type: "number", mandatory: true, options: [], fields: [] },
+    { name: "Customer Phone", key: "customer_phone", type: "text", mandatory: true, options: [], fields: [] },
+    { name: "Customer Name", key: "customer_name", type: "text", mandatory: true, options: [], fields: [] },
+    {
+      name: "Jobcard Status",
+      key: "jobcard_status",
+      type: "dropdown",
+      mandatory: true,
+      options: [
+        { value: "Pending", displayByDefault: true, color: "#ffcc00" },
+        { value: "In Progress", displayByDefault: false, color: "#00bfff" },
+        { value: "Completed", displayByDefault: false, color: "#4caf50" },
+      ],
+      fields: [],
+    },
+    {
+      name: "Items",
+      key: "items",
+      type: "list",
+      mandatory: true,
+      options: [],
+      fields: [
+        { name: "Item Name", key: "item_name", type: "text", mandatory: true, options: [], fields: [] },
+        { name: "Item Qty", key: "item_qty", type: "number", mandatory: true, options: [], fields: [] },
+        {
+          name: "Item Status",
+          key: "item_status",
+          type: "dropdown",
+          mandatory: true,
+          options: [
+            { value: "Pending", color: "#ffcc00" },
+            { value: "In Progress", color: "#00bfff" },
+            { value: "Completed", color: "#4caf50" },
+          ],
+          fields: [],
+        },
+        {
+          name: "Parts",
+          key: "parts",
+          type: "list",
+          mandatory: true,
+          options: [],
+          fields: [
+            { name: "Part Name", key: "part_name", type: "text", mandatory: true, options: [], fields: [] },
+            { name: "Part Price", key: "part_price", type: "number", mandatory: true, options: [], fields: [] },
+            { name: "Part Qty", key: "part_qty", type: "number", mandatory: true, options: [], fields: [] },
+          ],
+        },
+      ],
+    },
+  ];
+
+// --- MAIN SETTINGS COMPONENT ---
 
 const Settings = () => {
     const [activeTab, setActiveTab] = useState("personal");
@@ -25,7 +274,7 @@ const Settings = () => {
     const [editingMessageId, setEditingMessageId] = useState(null);
     const customTextRef = useRef(null);
 
-    // Jobcard Schema
+    // Jobcard Schema (for modal)
     const [jobCardSchema, setJobCardSchema] = useState(null);
 
     // Customer Details
@@ -35,14 +284,18 @@ const Settings = () => {
     const [itemName, setItemName] = useState("");
     const [savedItems, setSavedItems] = useState([]);
 
-    // 🚀 NEW: Saved Parts
+    // Saved Parts
     const [partName, setPartName] = useState("");
     const [partPrice, setPartPrice] = useState("");
     const [savedParts, setSavedParts] = useState([]);
     const [editingPartId, setEditingPartId] = useState(null);
 
+    // State for Jobcard Config
+    const [fields, setFields] = useState([]);
+
     const navigate = useNavigate();
 
+    // 🚀 FIX: useEffect dependency array corrected, functions un-commented
     useEffect(() => {
         const token = sessionStorage.getItem("token");
         if (!token) {
@@ -58,11 +311,12 @@ const Settings = () => {
         }
 
         fetchMessages();
-        fetchSchema();
+        fetchSchema(); // This is for the WhatsApp modal fields
         fetchCustomers();
         fetchSavedItems();
-        fetchSavedParts(); // 🚀 NEW: Fetch parts on load
-    }, [navigate]);
+        fetchSavedParts();
+        fetchJobCardConfig();
+    }, [navigate]); // Dependency array is now correct, won't cause loop
 
     const fetchMessages = async () => {
         try {
@@ -111,8 +365,7 @@ const Settings = () => {
             console.error("Error fetching items:", err);
         }
     };
-
-    // 🚀 NEW: Function to fetch saved parts
+    
     const fetchSavedParts = async () => {
         try {
             const token = sessionStorage.getItem("token");
@@ -128,6 +381,50 @@ const Settings = () => {
             console.error("Error fetching parts:", err);
         }
     };
+
+    const fetchJobCardConfig = async () => {
+        const token = sessionStorage.getItem("token");
+        try {
+            const res = await api.get("/user/get-configs", {
+                headers: { authorization: `Bearer ${token}` },
+            });
+            if (res.status === 200) {
+                let schema = res.data.schema || [];
+                setFields(schema.length ? schema : defaultConfig);
+            } else if (res.status === 204) {
+                setFields(defaultConfig);
+            }
+        } catch (err) {
+            if (err.response && err.response.status === 401) {
+                alert("Unauthorized. Please log in again.");
+                navigate("/");
+            } else {
+                console.error("Error fetching configuration:", err);
+                alert("Sorry we could not fetch your past configuration. Loading default schema.");
+                setFields(defaultConfig);
+            }
+        }
+    };
+
+    const saveConfig = async () => {
+        const token = sessionStorage.getItem("token");
+        await api
+          .post("/user/save-config", { schema: fields }, { headers: { authorization: `Bearer ${token}` } })
+          .then((resp) => {
+            if (resp.status === 200) {
+              alert(resp.data.message);
+            }
+          })
+          .catch((err) => {
+            if (err.status === 401) {
+              alert("Unauthorized. Please log in again.");
+              navigate("/");
+            } else {
+              console.error("Error saving configuration:", err);
+              alert("Failed to save configuration. Please try again.");
+            }
+          });
+      };
 
     const handleAddItem = async (e) => {
         e.preventDefault();
@@ -181,14 +478,12 @@ const Settings = () => {
         }
     };
 
-    // 🚀 NEW: Function to clear the part form
     const clearPartForm = () => {
         setPartName("");
         setPartPrice("");
         setEditingPartId(null);
     };
 
-    // 🚀 NEW: Function to handle saving or updating a part
     const handleSavePart = async (e) => {
         e.preventDefault();
         const trimmedPartName = partName.trim();
@@ -246,7 +541,6 @@ const Settings = () => {
         }
     };
 
-    // 🚀 NEW: Function to populate form for editing
     const handleEditPart = (part) => {
         setEditingPartId(part._id);
         setPartName(part.part_name);
@@ -254,7 +548,6 @@ const Settings = () => {
         window.scrollTo(0, 0); // Scroll to top to see the form
     };
 
-    // 🚀 NEW: Function to delete a saved part
     const handleDeletePart = async (id) => {
         if (!window.confirm("Are you sure you want to delete this part?")) return;
 
@@ -303,7 +596,7 @@ const Settings = () => {
     };
 
     const fetchSchema = async () => {
-        // ... (function unchanged)
+        // This schema is for the WhatsApp modal
         try {
             const token = sessionStorage.getItem("token");
             const res = await api.get("/user/get-config", {
@@ -311,7 +604,7 @@ const Settings = () => {
             });
             setJobCardSchema(res.data);
         } catch (err) {
-            if (err.response?.status === 401) { // Corrected err.status to err.response.status
+            if (err.response?.status === 401) { 
                 alert("Session expired. Please log in again.");
                 navigate("/");
             }
@@ -320,7 +613,6 @@ const Settings = () => {
     };
 
     const getRelevantFields = (schema) => {
-        // ... (function unchanged)
         if (!schema?.schema) return [];
         const usefulKeys = [
             "job_no",
@@ -351,7 +643,6 @@ const Settings = () => {
     };
 
     const handleSaveMessage = async () => {
-        // ... (function unchanged)
         if (!messageName.trim()) {
             alert("Please enter a message name.");
             return;
@@ -394,7 +685,6 @@ const Settings = () => {
     };
 
     const handleDeleteMessage = async (id) => {
-        // ... (function unchanged)
         if (!window.confirm("Are you sure you want to delete this message?")) return;
         try {
             const token = sessionStorage.getItem("token");
@@ -409,7 +699,6 @@ const Settings = () => {
     };
 
     const openEditModal = (msg) => {
-        // ... (function unchanged)
         setEditingMessageId(msg._id);
         setMessageName(msg.name);
         setCustomText(msg.text);
@@ -417,7 +706,6 @@ const Settings = () => {
     };
 
     const handleNameChange = async (e) => {
-        // ... (function unchanged)
         e.preventDefault();
         try {
             const token = sessionStorage.getItem("token");
@@ -442,7 +730,6 @@ const Settings = () => {
     };
 
     const handleVerifyPassword = async (e) => {
-        // ... (function unchanged)
         e.preventDefault();
         try {
             const token = sessionStorage.getItem("token");
@@ -467,7 +754,6 @@ const Settings = () => {
     };
 
     const handlePasswordChange = async (e) => {
-        // ... (function unchanged)
         e.preventDefault();
         if (password !== confirmPassword) {
             alert("Passwords do not match!");
@@ -498,7 +784,6 @@ const Settings = () => {
     };
 
     const insertField = (key) => {
-        // ... (function unchanged)
         if (!customTextRef.current) return;
         const textarea = customTextRef.current;
         const cursorPos = textarea.selectionStart;
@@ -545,12 +830,18 @@ const Settings = () => {
                     >
                         Saved Items
                     </button>
-                    {/* 🚀 NEW: Saved Parts Tab Button */}
                     <button
                         className={`tab-btn ${activeTab === "savedparts" ? "active" : ""}`}
                         onClick={() => setActiveTab("savedparts")}
                     >
                         Saved Parts
+                    </button>
+                    
+                    <button
+                        className={`tab-btn ${activeTab === "jobcard" ? "active" : ""}`}
+                        onClick={() => setActiveTab("jobcard")}
+                    >
+                        Customise Jobcard fields
                     </button>
                 </div>
 
@@ -558,7 +849,6 @@ const Settings = () => {
                 <div className="settings-right">
                     {activeTab === "personal" && (
                         <>
-                            {/* ... (personal info content unchanged) ... */}
                             <h2>Personal Information</h2>
                             <hr />
                             <form onSubmit={handleNameChange} className="settings-form">
@@ -634,7 +924,6 @@ const Settings = () => {
 
                     {activeTab === "whatsapp" && (
                         <>
-                            {/* ... (whatsapp content unchanged) ... */}
                             <h2>WhatsApp Messages</h2>
                             <hr />
                             <div className="whatsapp-scroll">
@@ -668,7 +957,6 @@ const Settings = () => {
 
                     {activeTab === "customerdetails" && (
                         <>
-                            {/* ... (customer details content unchanged) ... */}
                             <h2>Customer Details</h2>
                             <hr />
                             <div className="customer-table-container">
@@ -711,7 +999,6 @@ const Settings = () => {
 
                     {activeTab === "saveditems" && (
                         <>
-                            {/* ... (saved items content unchanged) ... */}
                             <h2>Saved Items</h2>
                             <hr />
 
@@ -755,8 +1042,7 @@ const Settings = () => {
                             </div>
                         </>
                     )}
-
-                    {/* 🚀 NEW: Saved Parts Tab Content */}
+                    
                     {activeTab === "savedparts" && (
                         <>
                             <h2>Saved Parts</h2>
@@ -766,6 +1052,7 @@ const Settings = () => {
                             <form onSubmit={handleSavePart} className="settings-form saved-item-form">
                                 <label>{editingPartId ? "Edit Part" : "Add New Part"}</label>
                                 <div className="input-with-button">
+                                    {/* 🚀 FIX #3: Corrected e.g.target.value to e.target.value */}
                                     <input
                                         type="text"
                                         placeholder="Enter part name"
@@ -839,13 +1126,24 @@ const Settings = () => {
                             </div>
                         </>
                     )}
+
+                    {activeTab === "jobcard" && (
+                        <>
+                            <h2>Customise Jobcard fields</h2>
+                            <hr />
+                            <FieldConfig fields={fields} setFields={setFields} />
+                            <br />
+                            <button onClick={saveConfig} className="save-btn" style={{alignSelf: 'flex-start'}}>
+                                Save Configuration
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
             {/* Modal */}
             {showModal && (
                 <div className="modal-overlay">
-                    {/* ... (modal content unchanged) ... */}
                     <div className="modal-content modal-grid">
                         <div className="modal-left">
                             <h3>{editingMessageId ? "Edit Message" : "Create New Message"}</h3>
