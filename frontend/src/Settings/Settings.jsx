@@ -5,12 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { FaPen, FaPlus, FaTrash, FaEdit, FaSave } from "react-icons/fa";
 import Navbar from "../Navbar/Navbar";
 
+// --- HELPER COMPONENTS ---
 
 const generateKey = (name) => {
     return name.trim().toLowerCase().replace(/\s+/g, "_");
 };
 
 const FieldConfig = ({ fields, setFields, level = 0 }) => {
+    // ... (All the code for FieldConfig remains exactly the same) ...
     const addField = () => {
         const newField = {
             name: "",
@@ -196,7 +198,10 @@ const FieldConfig = ({ fields, setFields, level = 0 }) => {
     );
 };
 
+// --- CONSTANTS ---
+
 const defaultConfig = [
+    // ... (defaultConfig array unchanged) ...
     { name: "Job Number", key: "job_no", type: "number", mandatory: true, options: [], fields: [] },
     { name: "Customer Phone", key: "customer_phone", type: "text", mandatory: true, options: [], fields: [] },
     { name: "Customer Name", key: "customer_name", type: "text", mandatory: true, options: [], fields: [] },
@@ -249,6 +254,14 @@ const defaultConfig = [
     },
 ];
 
+// 🚀 NEW: Added plans constant
+const plans = [
+    { id: "monthly", title: "Monthly Plan", price: "₹100", duration: "per month" },
+    { id: "yearly", title: "Yearly Plan", price: "₹1000", duration: "per year" },
+];
+
+// --- MAIN SETTINGS COMPONENT ---
+
 const Settings = () => {
     const [activeTab, setActiveTab] = useState("personal");
 
@@ -285,6 +298,7 @@ const Settings = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
+        // ... (useEffect logic unchanged) ...
         const token = sessionStorage.getItem("token");
         if (!token) {
             alert("Please log in first.");
@@ -306,6 +320,7 @@ const Settings = () => {
         fetchJobCardConfig();
     }, [navigate]);
 
+    // ... (All fetch functions: fetchMessages, fetchCustomers, etc. remain unchanged) ...
     const fetchMessages = async () => {
         try {
             const token = sessionStorage.getItem("token");
@@ -394,6 +409,7 @@ const Settings = () => {
         }
     };
 
+    // ... (All handler functions: saveConfig, handleAddItem, etc. remain unchanged) ...
     const saveConfig = async () => {
         const token = sessionStorage.getItem("token");
         await api
@@ -421,15 +437,12 @@ const Settings = () => {
             alert("Please enter an item name.");
             return;
         }
-
         try {
             const token = sessionStorage.getItem("token");
             const payload = { item_name: trimmedItemName };
-
             const res = await api.post("/user/items", payload, {
                 headers: { authorization: `Bearer ${token}` },
             });
-
             if (res.data.success) {
                 alert("Item added successfully.");
                 setSavedItems([...savedItems, res.data.item]);
@@ -445,13 +458,11 @@ const Settings = () => {
 
     const handleDeleteItem = async (id) => {
         if (!window.confirm("Are you sure you want to delete this item?")) return;
-
         try {
             const token = sessionStorage.getItem("token");
             const res = await api.delete(`/user/items/${id}`, {
                 headers: { authorization: `Bearer ${token}` },
             });
-
             if (res.status === 200) {
                 alert("Item deleted successfully.");
                 setSavedItems(prevItems =>
@@ -476,7 +487,6 @@ const Settings = () => {
         e.preventDefault();
         const trimmedPartName = partName.trim();
         const price = parseFloat(partPrice);
-
         if (!trimmedPartName) {
             alert("Please enter a part name.");
             return;
@@ -485,10 +495,8 @@ const Settings = () => {
             alert("Please enter a valid price.");
             return;
         }
-
         const payload = { part_name: trimmedPartName, part_price: price };
         const token = sessionStorage.getItem("token");
-
         try {
             let res;
             if (editingPartId) {
@@ -510,7 +518,6 @@ const Settings = () => {
                     setSavedParts([...savedParts, res.data.part]);
                 }
             }
-
             if (res.data.success) {
                 clearPartForm();
             } else {
@@ -536,13 +543,11 @@ const Settings = () => {
 
     const handleDeletePart = async (id) => {
         if (!window.confirm("Are you sure you want to delete this part?")) return;
-
         try {
             const token = sessionStorage.getItem("token");
             const res = await api.delete(`/user/parts/${id}`, {
                 headers: { authorization: `Bearer ${token}` },
             });
-
             if (res.status === 200) {
                 alert("Part deleted successfully.");
                 setSavedParts(prevParts =>
@@ -557,16 +562,13 @@ const Settings = () => {
         }
     };
 
-
     const handleDeleteCustomer = async (id) => {
         if (!window.confirm("Are you sure you want to delete this customer?")) return;
-
         try {
             const token = sessionStorage.getItem("token");
             const res = await api.delete(`/user/customerdetails/${id}`, {
                 headers: { authorization: `Bearer ${token}` },
             });
-
             if (res.status === 200) {
                 alert("Customer deleted successfully.");
                 setCustomers(prevCustomers =>
@@ -598,23 +600,14 @@ const Settings = () => {
     };
 
     const getRelevantFields = (schema) => {
+        // ... (getRelevantFields function unchanged) ...
         if (!schema?.schema) return [];
-        const usefulKeys = [
-            "job_no",
-            "customer_name",
-            "customer_phone",
-            "item_name",
-            "item_qty",
-            "item_serial",
-        ];
-
+        const usefulKeys = ["job_no", "customer_name", "customer_phone", "item_name", "item_qty", "item_serial"];
         const fields = [];
-
         schema.schema.forEach((field) => {
             if (usefulKeys.includes(field.key)) {
                 fields.push({ name: field.name, key: field.key });
             }
-
             if (field.key === "items" && Array.isArray(field.fields)) {
                 field.fields.forEach((subField) => {
                     if (usefulKeys.includes(subField.key)) {
@@ -623,25 +616,22 @@ const Settings = () => {
                 });
             }
         });
-
         return fields;
     };
 
     const handleSaveMessage = async () => {
+        // ... (handleSaveMessage function unchanged) ...
         if (!messageName.trim()) {
             alert("Please enter a message name.");
             return;
         }
-
         const token = sessionStorage.getItem("token");
         if (!token) return navigate("/");
-
         try {
             const payload = {
                 name: messageName.trim(),
                 text: customText.replace(/\n/g, "\\n").trim(),
             };
-
             let res;
             if (editingMessageId) {
                 res = await api.put(
@@ -654,7 +644,6 @@ const Settings = () => {
                     headers: { authorization: `Bearer ${token}` },
                 });
             }
-
             if (res.status === 200 || res.status === 201) {
                 alert(`Message ${editingMessageId ? "updated" : "created"} successfully`);
                 setShowModal(false);
@@ -670,6 +659,7 @@ const Settings = () => {
     };
 
     const handleDeleteMessage = async (id) => {
+        // ... (handleDeleteMessage function unchanged) ...
         if (!window.confirm("Are you sure you want to delete this message?")) return;
         try {
             const token = sessionStorage.getItem("token");
@@ -684,6 +674,7 @@ const Settings = () => {
     };
 
     const openEditModal = (msg) => {
+        // ... (openEditModal function unchanged) ...
         setEditingMessageId(msg._id);
         setMessageName(msg.name);
         setCustomText(msg.text);
@@ -691,17 +682,16 @@ const Settings = () => {
     };
 
     const handleNameChange = async (e) => {
+        // ... (handleNameChange function unchanged) ...
         e.preventDefault();
         try {
             const token = sessionStorage.getItem("token");
             if (!token) navigate("/");
-
             const resp = await api.put(
                 "/api/update-name",
                 { name },
                 { headers: { authorization: `Bearer ${token}` } }
             );
-
             if (resp.status === 200) {
                 alert("Name updated successfully to " + resp.data.name);
                 sessionStorage.setItem("userName", resp.data.name);
@@ -715,17 +705,16 @@ const Settings = () => {
     };
 
     const handleVerifyPassword = async (e) => {
+        // ... (handleVerifyPassword function unchanged) ...
         e.preventDefault();
         try {
             const token = sessionStorage.getItem("token");
             if (!token) navigate("/");
-
             const resp = await api.post(
                 "/api/verify-password",
                 { currentPassword },
                 { headers: { authorization: `Bearer ${token}` } }
             );
-
             if (resp.status === 200 && resp.data.verified) {
                 alert("Password verified successfully.");
                 setIsVerified(true);
@@ -739,22 +728,20 @@ const Settings = () => {
     };
 
     const handlePasswordChange = async (e) => {
+        // ... (handlePasswordChange function unchanged) ...
         e.preventDefault();
         if (password !== confirmPassword) {
             alert("Passwords do not match!");
             return;
         }
-
         try {
             const token = sessionStorage.getItem("token");
             if (!token) navigate("/");
-
             const resp = await api.put(
                 "/api/update-password",
                 { password },
                 { headers: { authorization: `Bearer ${token}` } }
             );
-
             if (resp.status === 200) {
                 alert("Password updated successfully.");
                 setCurrentPassword("");
@@ -769,15 +756,14 @@ const Settings = () => {
     };
 
     const insertField = (key) => {
+        // ... (insertField function unchanged) ...
         if (!customTextRef.current) return;
         const textarea = customTextRef.current;
         const cursorPos = textarea.selectionStart;
         const textBefore = customText.slice(0, cursorPos);
         const textAfter = customText.slice(cursorPos);
-
         const newText = `${textBefore}{${key}}${textAfter}`;
         setCustomText(newText);
-
         setTimeout(() => {
             const newCursorPos = cursorPos + key.length + 2;
             textarea.focus();
@@ -821,12 +807,18 @@ const Settings = () => {
                     >
                         Saved Parts
                     </button>
-
                     <button
                         className={`tab-btn ${activeTab === "jobcard" ? "active" : ""}`}
                         onClick={() => setActiveTab("jobcard")}
                     >
                         Customise Jobcard fields
+                    </button>
+                    {/* 🚀 NEW: Subscription Tab Button */}
+                    <button
+                        className={`tab-btn ${activeTab === "subscription" ? "active" : ""}`}
+                        onClick={() => setActiveTab("subscription")}
+                    >
+                        Subscription Plans
                     </button>
                 </div>
 
@@ -834,6 +826,7 @@ const Settings = () => {
                 <div className="settings-right">
                     {activeTab === "personal" && (
                         <>
+                            {/* ... (personal tab JSX unchanged) ... */}
                             <h2>Personal Information</h2>
                             <hr />
                             <form onSubmit={handleNameChange} className="settings-form">
@@ -863,7 +856,6 @@ const Settings = () => {
                                     Update Name
                                 </button>
                             </form>
-
                             <div className="settings-form">
                                 <label>Change Password</label>
                                 <form onSubmit={handleVerifyPassword} className="settings-form">
@@ -881,7 +873,6 @@ const Settings = () => {
                                         </button>
                                     )}
                                 </form>
-
                                 {isVerified && (
                                     <form onSubmit={handlePasswordChange} className="settings-form">
                                         <input
@@ -909,6 +900,7 @@ const Settings = () => {
 
                     {activeTab === "whatsapp" && (
                         <>
+                            {/* ... (whatsapp tab JSX unchanged) ... */}
                             <h2>WhatsApp Messages</h2>
                             <hr />
                             <div className="whatsapp-scroll">
@@ -942,6 +934,7 @@ const Settings = () => {
 
                     {activeTab === "customerdetails" && (
                         <>
+                            {/* ... (customerdetails tab JSX unchanged) ... */}
                             <h2>Customer Details</h2>
                             <hr />
                             <div className="customer-table-container">
@@ -984,9 +977,9 @@ const Settings = () => {
 
                     {activeTab === "saveditems" && (
                         <>
+                            {/* ... (saveditems tab JSX unchanged) ... */}
                             <h2>Saved Items</h2>
                             <hr />
-
                             <form onSubmit={handleAddItem} className="settings-form saved-item-form">
                                 <label>Add New Item</label>
                                 <div className="input-with-button">
@@ -1002,7 +995,6 @@ const Settings = () => {
                                     </button>
                                 </div>
                             </form>
-
                             <div className="saved-items-list-container">
                                 <h4>Existing Items</h4>
                                 {savedItems.length > 0 ? (
@@ -1030,21 +1022,19 @@ const Settings = () => {
 
                     {activeTab === "savedparts" && (
                         <>
+                            {/* ... (savedparts tab JSX unchanged) ... */}
                             <h2>Saved Parts</h2>
                             <hr />
-
-                            {/* Add/Edit Part Form */}
                             <form onSubmit={handleSavePart} className="settings-form saved-item-form">
                                 <label>{editingPartId ? "Edit Part" : "Add New Part"}</label>
                                 <div className="input-with-button">
-                                    {/* 🚀 FIX #3: Corrected e.g.target.value to e.target.value */}
                                     <input
                                         type="text"
                                         placeholder="Enter part name"
                                         value={partName}
                                         onChange={(e) => setPartName(e.target.value)}
                                         className="light-input"
-                                        style={{ flex: 2 }} // Give more space
+                                        style={{ flex: 2 }}
                                     />
                                     <input
                                         type="number"
@@ -1052,7 +1042,7 @@ const Settings = () => {
                                         value={partPrice}
                                         onChange={(e) => setPartPrice(e.target.value)}
                                         className="light-input"
-                                        style={{ flex: 1 }} // Give less space
+                                        style={{ flex: 1 }}
                                     />
                                     <button type="submit" className="add-btn">
                                         {editingPartId ? <FaSave /> : <FaPlus />}
@@ -1065,8 +1055,6 @@ const Settings = () => {
                                     )}
                                 </div>
                             </form>
-
-                            {/* List of Saved Parts */}
                             <div className="customer-table-container" style={{ marginTop: '30px' }}>
                                 <h4>Existing Parts</h4>
                                 <table className="customer-table">
@@ -1114,6 +1102,7 @@ const Settings = () => {
 
                     {activeTab === "jobcard" && (
                         <>
+                            {/* ... (jobcard tab JSX unchanged) ... */}
                             <h2>Customise Jobcard fields</h2>
                             <hr />
                             <FieldConfig fields={fields} setFields={setFields} />
@@ -1123,16 +1112,38 @@ const Settings = () => {
                             </button>
                         </>
                     )}
+
+                    {/* 🚀 NEW: Subscription Tab Content */}
+                    {activeTab === "subscription" && (
+                        <>
+                            <h2>Subscription Plans</h2>
+                            <hr />
+                            {/* Make sure to copy styles from subscriptionplans.css 
+                into settings.css for 'plans-container' and 'plan-card'
+              */}
+                            <div className="plans-container">
+                                {plans.map((plan) => (
+                                    <div key={plan.id} className="plan-card">
+                                        <h3>{plan.title}</h3>
+                                        <p className="plan-price">{plan.price}</p>
+                                        <p className="plan-duration">{plan.duration}</p>
+                                        {/* You can add a "Buy Now" or "Current Plan" button here */}
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
                 </div>
             </div>
 
             {/* Modal */}
             {showModal && (
                 <div className="modal-overlay">
+                    {/* ... (modal JSX unchanged) ... */}
                     <div className="modal-content modal-grid">
                         <div className="modal-left">
                             <h3>{editingMessageId ? "Edit Message" : "Create New Message"}</h3>
-
                             <label>Message Name</label>
                             <input
                                 type="text"
@@ -1140,7 +1151,6 @@ const Settings = () => {
                                 onChange={(e) => setMessageName(e.target.value)}
                                 className="light-input"
                             />
-
                             <label>Message Content</label>
                             <textarea
                                 ref={customTextRef}
@@ -1150,14 +1160,12 @@ const Settings = () => {
                                 className="light-input"
                                 placeholder="Type your message or insert fields..."
                             />
-
                             <div className="preview-section">
                                 <h4>Message Preview</h4>
                                 <div className="preview-box">
                                     <pre>{customText.replace(/\\n/g, "\n")}</pre>
                                 </div>
                             </div>
-
                             <div className="modal-actions">
                                 <button className="update-btn" onClick={handleSaveMessage}>
                                     Save
@@ -1172,7 +1180,6 @@ const Settings = () => {
                                 </button>
                             </div>
                         </div>
-
                         <div className="modal-right">
                             <h4>Available Fields</h4>
                             {jobCardSchema ? (
