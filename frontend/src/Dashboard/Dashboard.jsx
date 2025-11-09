@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [totalJobs, setTotalJobs] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isPlanExpired, setIsPlanExpired] = useState(false);
 
   const navigate = useNavigate();
   const token = sessionStorage.getItem("token");
@@ -22,6 +23,8 @@ export default function Dashboard() {
       navigate("/");
       return;
     }
+    const hasPlanExpired = sessionStorage.getItem("isPlanExpired") === "true";
+    setIsPlanExpired(hasPlanExpired);
 
     const fetchInitialData = async (isRetry = false) => {
       try {
@@ -99,6 +102,7 @@ export default function Dashboard() {
           startIcon={<AddCircleOutlineIcon />}
           className="create-job-btn"
           onClick={() => navigate("/create-job")}
+          disabled = {isPlanExpired}
         >
           Create Job Card
         </Button>

@@ -33,6 +33,7 @@ export default function CreateJobCard() {
   const [customerDetails, setCustomerDetails] = useState([]);
   const [savedItems, setSavedItems] = useState([]);
   const [savedParts, setSavedParts] = useState([]);
+  const [isPlanExpired, setIsPlanExpired] = useState(false);
 
   // ✅ Fetch schema
   useEffect(() => {
@@ -42,6 +43,8 @@ export default function CreateJobCard() {
       navigate("/");
       return;
     }
+    const hasPlanExpired = sessionStorage.getItem("isPlanExpired") === "true";
+    setIsPlanExpired(hasPlanExpired);
 
     api.get("/user/get-config", {
       headers: { authorization: `Bearer ${token}` },
@@ -294,6 +297,11 @@ export default function CreateJobCard() {
         navigate("/");
         return;
       }
+      else if(err.response?.status === 403) {
+        alert("Cannot create new Jobcard. Your subscription may have expired.");
+        navigate("/settings");
+        return;
+      }
       console.error("Job save failed:", err);
       alert("Could not save job.");
     }
@@ -357,7 +365,7 @@ export default function CreateJobCard() {
           />
         </div>
 
-        <div key="customer_phone" className="field-item">
+        <div key="customer_name" className="field-item">
           <Autocomplete
             freeSolo
             options={customerDetails.map((c) => c.customer_name)}
@@ -513,7 +521,7 @@ export default function CreateJobCard() {
           </div>
         ))}
 
-      <Button variant="contained" color="primary" onClick={handleSave} className="save-btn">
+      <Button variant="contained" color="primary" onClick={handleSave} className="save-btn" disabled={isPlanExpired}>
         Save Job
       </Button>
 

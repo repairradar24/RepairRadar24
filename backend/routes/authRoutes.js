@@ -69,12 +69,25 @@ router.post('/signin', async (req, res) => {
       return;
     }
 
+    let isPlanExpired = false;
+
+    if (!user.validity) {
+      console.warn(`User ${user.email} has no 'validityEndDate'. Treating as active.`);
+    } else {
+      const validityDate = new Date(user.validity);
+
+      validityDate.setHours(23, 59, 59, 999);
+
+      isPlanExpired = new Date() > validityDate;
+    }
+
 
     // Generate JWT token
     const token = jwt.sign(
       {
         userId: user._id,
-        email: user.email
+        email: user.email,
+        isExpired: isPlanExpired
       },
       JWT_SECRET,
       { expiresIn: '6h' } // Token valid for 6 hours
@@ -86,7 +99,8 @@ router.post('/signin', async (req, res) => {
       message: 'Signin successful',
       token,
       user: { name: user.name, email: user.email },
-      schemaConfigured: user.schemaConfigured
+      schemaConfigured: user.schemaConfigured,
+      isPlanExpired: isPlanExpired
     });
 
   } catch (err) {

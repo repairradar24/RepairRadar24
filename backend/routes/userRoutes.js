@@ -1,6 +1,7 @@
 // routes/userRoutes.js
 const express = require('express');
-const authenticateAndGetUserDb = require('../middleware/middleware');
+const authenticateAndGetUserDb = require('../middleware/authMiddleware')
+const checkSubscription = require('../middleware/checkValidityMiddleware');
 const { getUserDb } = require('../config/userDb');
 const { getMainDb } = require('../config/mainDb');
 const { ObjectId } = require("mongodb");
@@ -183,48 +184,51 @@ const upsertCustomerInBackground = async (
   }
 };
 
-router.post("/jobs/savejobcard", authenticateAndGetUserDb, async (req, res) => {
-  try {
-    const userDbConnection = await getUserDb(req.token);
-    if (!userDbConnection) {
-      console.log("User not found in cached backend map");
-      return res.status(401).json({ error: "Connection timed out" });
+router.post("/jobs/savejobcard",
+  authenticateAndGetUserDb,
+  checkSubscription,
+  async (req, res) => {
+    try {
+      const userDbConnection = await getUserDb(req.token);
+      if (!userDbConnection) {
+        console.log("User not found in cached backend map");
+        return res.status(401).json({ error: "Connection timed out" });
+      }
+
+      const jobsCollection = userDbConnection.collection("jobs");
+      const customersDataCollection = userDbConnection.collection("customer_phones");
+
+      const newJob = req.body;
+
+      // Generate job number
+      const lastJob = await jobsCollection.findOne({}, { sort: { job_no: -1 } });
+      const nextJobNo = lastJob ? lastJob.job_no + 1 : 1;
+
+      newJob.job_no = nextJobNo;
+      newJob.createdAt = new Date();
+
+      // Save jobcard first (main operation)
+      await jobsCollection.insertOne(newJob);
+
+      // Send response immediately (non-blocking)
+      res.json({
+        success: true,
+        message: "Job saved successfully",
+        job_no: nextJobNo,
+      });
+
+      // 🔄 Call the new non-blocking function
+      upsertCustomerInBackground(
+        customersDataCollection,
+        newJob.customer_phone,
+        newJob.customer_name
+      );
+
+    } catch (err) {
+      console.error("Error saving job:", err);
+      res.status(500).json({ success: false, message: "Failed to save job" });
     }
-
-    const jobsCollection = userDbConnection.collection("jobs");
-    const customersDataCollection = userDbConnection.collection("customer_phones");
-
-    const newJob = req.body;
-
-    // Generate job number
-    const lastJob = await jobsCollection.findOne({}, { sort: { job_no: -1 } });
-    const nextJobNo = lastJob ? lastJob.job_no + 1 : 1;
-
-    newJob.job_no = nextJobNo;
-    newJob.createdAt = new Date();
-
-    // Save jobcard first (main operation)
-    await jobsCollection.insertOne(newJob);
-
-    // Send response immediately (non-blocking)
-    res.json({
-      success: true,
-      message: "Job saved successfully",
-      job_no: nextJobNo,
-    });
-
-    // 🔄 Call the new non-blocking function
-    upsertCustomerInBackground(
-      customersDataCollection,
-      newJob.customer_phone,
-      newJob.customer_name
-    );
-
-  } catch (err) {
-    console.error("Error saving job:", err);
-    res.status(500).json({ success: false, message: "Failed to save job" });
-  }
-});
+  });
 
 router.get("/jobs/getjobcard/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
