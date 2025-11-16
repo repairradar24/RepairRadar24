@@ -23,23 +23,30 @@ router.get('/my-data', authenticateAndGetUserDb, async (req, res) => {
 
 // POST /save-config
 router.post("/save-config", authenticateAndGetUserDb, async (req, res) => {
-  console.log(req);
+  // console.log(req);
 
   const { schema } = req.body;
   const userId = req.user.userId; // from auth middleware
 
   const mainDbConnection = await getMainDb();
 
+  // Assuming this returns the Shared App Database connection
   const userDbConnection = await getUserDb(req.token);
+
   if (!userDbConnection) {
     console.log("User not found in cached backend map");
     return res.status(401).json({ error: 'Connection timed out' });
   }
 
-  // Save schema to user DB
+  // Save schema to user DB (Shared Collection)
   await userDbConnection.collection("settings").updateOne(
-    { schemaType: "jobCard" },
-    { $set: { schema, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+    // 1. FILTER: Look for document that matches BOTH the user ID and the type
+    { uid: userId, schemaType: "jobCard" },
+    {
+      $set: { schema, updatedAt: new Date() },
+      // 2. INSERT: If creating a new doc, ensure 'uid' is added
+      $setOnInsert: { createdAt: new Date(), uid: userId }
+    },
     { upsert: true }
   );
 
@@ -56,18 +63,17 @@ router.get("/get-config", authenticateAndGetUserDb, async (req, res) => {
   const userId = req.user.userId; // from auth middleware
 
   const userDbConnection = await getUserDb(req.token);
-  if (!userDbConnection) {
-    console.log("User not found in cached backend map");
-    return res.status(401).json({ error: 'Connection timed out' });
-  }
 
   if (!userDbConnection) {
     console.log("User not found in cached backend map");
     return res.status(401).json({ error: 'Connection timed out' });
   }
 
-  // Fetch schema from user DB
-  const config = await userDbConnection.collection("settings").findOne({ schemaType: "jobCard" });
+  // Fetch schema from user DB (Scoped by UID)
+  const config = await userDbConnection.collection("settings").findOne({
+    uid: userId, // <--- Added this check
+    schemaType: "jobCard"
+  });
 
   if (!config) {
     return res.status(204).json({ error: 'Configuration not found' });
@@ -78,13 +84,17 @@ router.get("/get-config", authenticateAndGetUserDb, async (req, res) => {
 
 router.get("/jobs/count", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
+
     const userDbConnection = await getUserDb(req.token);
     if (!userDbConnection) {
       console.log("User not found in cached backend map");
       return res.status(401).json({ error: 'Connection timed out' });
     }
 
-    const total = await userDbConnection.collection("jobs").countDocuments({});
+    // Count documents ONLY for this user
+    const total = await userDbConnection.collection("jobs").countDocuments({ uid: userId });
+
     console.log("Total jobs count:", total);
     return res.status(200).json({ total });
   } catch (err) {
@@ -95,34 +105,47 @@ router.get("/jobs/count", authenticateAndGetUserDb, async (req, res) => {
 
 router.get("/jobs/getjobcards", authenticateAndGetUserDb, async (req, res) => {
   try {
-    const userDb = getUserDb(req.token);
+    const userId = req.user.userId; // from auth middleware
+
+    // Assuming getUserDb is synchronous or returns a promise. 
+    // If it's async, you need 'await'. Based on your previous snippets, it seems async.
+    const userDb = await getUserDb(req.token);
+
     if (!userDb) {
       return res.status(500).json({ error: "User DB not found" });
     }
 
     // Pagination params
-    let page = parseInt(req.query.page) || 1;
+    let page = parseInt(req.query.page) || 1; // if page comes as 0 or undefined, default to 1 logic or handle offset directly
+    // But based on your frontend logic (offset based), let's stick to offset/limit or fix page calculation
+    // Frontend sends offset & limit directly? Or page?
+    // Code snippet says: req.query.offset and req.query.limit usually for skipping.
+
+    // Let's look at your code: you use 'skip' variable.
+    // If frontend sends 'offset', use that directly as 'skip'.
+    // If frontend sends 'page', calculate skip.
+
+    // Standardizing based on your provided snippet logic:
     let limit = parseInt(req.query.limit) || 20;
-    if (page < 1) page = 1;
+    let offset = parseInt(req.query.offset) || 0; // If using offset directly
 
-    const skip = (page - 1) * limit;
-
-    // Fetch jobs sorted by latest first
+    // Fetch jobs sorted by latest first, scoped by UID
     const jobs = await userDb
       .collection("jobs")
-      .find({})
+      .find({ uid: userId }) // <--- Added UID check
       .sort({ createdAt: -1 })
-      .skip(skip)
+      .skip(offset)
       .limit(limit)
       .toArray();
 
-    // Check if more jobs exist
-    const total = await userDb.collection("jobs").countDocuments();
-    const hasMore = skip + jobs.length < total;
+    // Check total count scoped by UID
+    const total = await userDb.collection("jobs").countDocuments({ uid: userId }); // <--- Added UID check
+
+    const hasMore = offset + jobs.length < total;
 
     res.json({
       jobs,
-      page,
+      offset,
       limit,
       total,
       hasMore,
@@ -135,6 +158,8 @@ router.get("/jobs/getjobcards", authenticateAndGetUserDb, async (req, res) => {
 
 router.get("/jobs/list", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
+
     const userDbConnection = await getUserDb(req.token);
     if (!userDbConnection) {
       console.log("User not found in cached backend map");
@@ -147,7 +172,7 @@ router.get("/jobs/list", authenticateAndGetUserDb, async (req, res) => {
 
     const jobs = await userDbConnection
       .collection("jobs")
-      .find({})
+      .find({ uid: userId }) // <--- Added UID check here
       .skip(skip)
       .limit(limit)
       .toArray();
@@ -162,14 +187,20 @@ router.get("/jobs/list", authenticateAndGetUserDb, async (req, res) => {
 const upsertCustomerInBackground = async (
   customersDataCollection,
   customer_phone,
-  customer_name
+  customer_name,
+  userId // <--- ADDED: Need user ID to scope the customer
 ) => {
   // Only run if we have both pieces of data
   if (customer_phone && customer_name) {
     try {
       await customersDataCollection.updateOne(
-        { customer_phone: customer_phone },
-        { $set: { customer_name: customer_name } },
+        // 1. FILTER: Find customer by phone AND user ID
+        { uid: userId, customer_phone: customer_phone },
+        {
+          $set: { customer_name: customer_name },
+          // 2. INSERT: Ensure 'uid' is set on creation
+          $setOnInsert: { uid: userId }
+        },
         { upsert: true }
       );
       // Optional: Log success if needed
@@ -189,7 +220,9 @@ router.post("/jobs/savejobcard",
   checkSubscription,
   async (req, res) => {
     try {
+      const userId = req.user.userId; // from auth middleware
       const userDbConnection = await getUserDb(req.token);
+
       if (!userDbConnection) {
         console.log("User not found in cached backend map");
         return res.status(401).json({ error: "Connection timed out" });
@@ -199,9 +232,13 @@ router.post("/jobs/savejobcard",
       const customersDataCollection = userDbConnection.collection("customer_phones");
 
       const newJob = req.body;
+      newJob.uid = userId; // <--- 1. ADD UID TO THE JOB
 
-      // Generate job number
-      const lastJob = await jobsCollection.findOne({}, { sort: { job_no: -1 } });
+      // Generate job number (Scoped by UID)
+      const lastJob = await jobsCollection.findOne(
+        { uid: userId }, // <--- 2. FIND LAST JOB FOR THIS USER ONLY
+        { sort: { job_no: -1 } }
+      );
       const nextJobNo = lastJob ? lastJob.job_no + 1 : 1;
 
       newJob.job_no = nextJobNo;
@@ -221,7 +258,8 @@ router.post("/jobs/savejobcard",
       upsertCustomerInBackground(
         customersDataCollection,
         newJob.customer_phone,
-        newJob.customer_name
+        newJob.customer_name,
+        userId // <--- 3. PASS USER ID HERE
       );
 
     } catch (err) {
@@ -232,11 +270,18 @@ router.post("/jobs/savejobcard",
 
 router.get("/jobs/getjobcard/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDbConnection = await getUserDb(req.token);
+
     if (!userDbConnection) return res.status(401).json({ error: "Connection timed out" });
 
     const jobsCollection = userDbConnection.collection("jobs");
-    const job = await jobsCollection.findOne({ _id: new ObjectId(req.params.id) });
+
+    // Find job by ID AND User ID (Security Check)
+    const job = await jobsCollection.findOne({
+      _id: new ObjectId(req.params.id),
+      uid: userId // <--- Critical: Only find if it belongs to this user
+    });
 
     if (!job) return res.status(404).json({ error: "Job not found" });
 
@@ -249,18 +294,22 @@ router.get("/jobs/getjobcard/:id", authenticateAndGetUserDb, async (req, res) =>
 
 router.put("/jobs/updatejobcard/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDbConnection = await getUserDb(req.token);
+
     if (!userDbConnection)
       return res.status(401).json({ error: "Connection timed out" });
 
     const jobsCollection = userDbConnection.collection("jobs");
-    const customersDataCollection =
-      userDbConnection.collection("customer_phones"); // 👈 Get collection
+    const customersDataCollection = userDbConnection.collection("customer_phones");
 
-    const { _id, job_no, ...updates } = req.body; // prevent changing job_no
+    const { _id, job_no, ...updates } = req.body; // prevent changing job_no or _id
 
     const result = await jobsCollection.updateOne(
-      { _id: new ObjectId(req.params.id) },
+      {
+        _id: new ObjectId(req.params.id),
+        uid: userId // <--- CRITICAL: Ensure user owns this job
+      },
       { $set: updates }
     );
 
@@ -274,25 +323,27 @@ router.put("/jobs/updatejobcard/:id", authenticateAndGetUserDb, async (req, res)
     upsertCustomerInBackground(
       customersDataCollection,
       updates.customer_phone,
-      updates.customer_name
+      updates.customer_name,
+      userId // <--- Pass userId here so the customer is saved to the correct user account
     );
 
   } catch (err) {
     console.error("Error updating job:", err);
     res.status(500).json({ error: "Failed to update job" });
   }
-}
-);
+});
 
 router.get("/whatsapp/get-messages", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDbConnection = await getUserDb(req.token);
+
     if (!userDbConnection)
       return res.status(401).json({ error: "Connection timed out" });
 
     const messages = await userDbConnection
       .collection("whatsapp_messages")
-      .find({})
+      .find({ uid: userId }) // <--- Added UID check
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -305,7 +356,9 @@ router.get("/whatsapp/get-messages", authenticateAndGetUserDb, async (req, res) 
 
 router.post("/whatsapp/create-message", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDbConnection = await getUserDb(req.token);
+
     if (!userDbConnection) return res.status(401).json({ error: "Connection timed out" });
 
     const { name, text } = req.body;
@@ -314,8 +367,8 @@ router.post("/whatsapp/create-message", authenticateAndGetUserDb, async (req, re
       return res.status(400).json({ error: "Name and text are required." });
     }
 
-    // const db = await getMainDb();
     await userDbConnection.collection("whatsapp_messages").insertOne({
+      uid: userId, // <--- ADDED: Scope this message to the user
       name,
       text,
       createdAt: new Date(),
@@ -334,7 +387,9 @@ router.post("/whatsapp/create-message", authenticateAndGetUserDb, async (req, re
 
 router.put("/whatsapp/update-message/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDbConnection = await getUserDb(req.token);
+
     if (!userDbConnection)
       return res.status(401).json({ error: "Connection timed out" });
 
@@ -347,7 +402,8 @@ router.put("/whatsapp/update-message/:id", authenticateAndGetUserDb, async (req,
     const result = await userDbConnection
       .collection("whatsapp_messages")
       .updateOne(
-        { _id: new ObjectId(id) },
+        // Filter by ID *AND* User ID
+        { _id: new ObjectId(id), uid: userId },
         { $set: { name, text, updatedAt: new Date() } }
       );
 
@@ -363,7 +419,9 @@ router.put("/whatsapp/update-message/:id", authenticateAndGetUserDb, async (req,
 
 router.delete("/whatsapp/delete-message/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDbConnection = await getUserDb(req.token);
+
     if (!userDbConnection)
       return res.status(401).json({ error: "Connection timed out" });
 
@@ -371,7 +429,10 @@ router.delete("/whatsapp/delete-message/:id", authenticateAndGetUserDb, async (r
 
     const result = await userDbConnection
       .collection("whatsapp_messages")
-      .deleteOne({ _id: new ObjectId(id) });
+      .deleteOne({
+        _id: new ObjectId(id),
+        uid: userId // <--- CRITICAL: Only delete if user owns it
+      });
 
     if (result.deletedCount === 0)
       return res.status(404).json({ error: "Message not found." });
@@ -385,12 +446,16 @@ router.delete("/whatsapp/delete-message/:id", authenticateAndGetUserDb, async (r
 
 router.get("/customerdetails", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDb = await getUserDb(req.token);
+
     if (!userDb) return res.status(401).json({ error: "Connection timed out" });
+
     const customers = await userDb
       .collection("customer_phones")
-      .find({})
+      .find({ uid: userId }) // <--- Critical: Filter by User ID
       .toArray();
+
     res.json({ success: true, customers });
   } catch (err) {
     console.error("Error fetching customers:", err);
@@ -400,6 +465,7 @@ router.get("/customerdetails", authenticateAndGetUserDb, async (req, res) => {
 
 router.delete("/customerdetails/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const { id } = req.params;
 
     // 1. Validate the ID format before proceeding
@@ -410,10 +476,14 @@ router.delete("/customerdetails/:id", authenticateAndGetUserDb, async (req, res)
     // 2. Get the user-specific database
     const userDb = await getUserDb(req.token);
     if (!userDb) return res.status(401).json({ error: "Connection timed out" });
+
     const deleteId = new ObjectId(id);
 
-    // 3. Perform the delete operation
-    const result = await userDb.collection("customer_phones").deleteOne({ _id: deleteId });
+    // 3. Perform the delete operation (Scoped by UID)
+    const result = await userDb.collection("customer_phones").deleteOne({
+      _id: deleteId,
+      uid: userId // <--- Critical: Only delete if user owns this customer
+    });
 
     // 4. Check if a document was actually deleted
     if (result.deletedCount === 0) {
@@ -431,9 +501,15 @@ router.delete("/customerdetails/:id", authenticateAndGetUserDb, async (req, res)
 
 router.get("/items", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDb = await getUserDb(req.token);
+
     if (!userDb) return res.status(401).json({ error: "Connection timed out" });
-    const items = await userDb.collection("items").find({}).toArray();
+
+    const items = await userDb.collection("items")
+      .find({ uid: userId }) // <--- Critical: Filter by User ID
+      .toArray();
+
     res.json({ success: true, items });
   } catch (err) {
     console.error("Error fetching items:", err);
@@ -443,14 +519,20 @@ router.get("/items", authenticateAndGetUserDb, async (req, res) => {
 
 router.post("/items", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const { item_name } = req.body;
+
     if (!item_name) {
       return res.status(400).json({ success: false, message: "Item name is required" });
     }
 
     const userDb = await getUserDb(req.token);
     if (!userDb) return res.status(401).json({ error: "Connection timed out" });
-    const newItem = { item_name: item_name.trim() };
+
+    const newItem = {
+      uid: userId, // <--- Critical: Tag item with User ID
+      item_name: item_name.trim()
+    };
 
     // Insert the new document
     const result = await userDb.collection("items").insertOne(newItem);
@@ -468,14 +550,21 @@ router.post("/items", authenticateAndGetUserDb, async (req, res) => {
 
 router.delete("/items/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const { id } = req.params;
+
     if (!ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: "Invalid ID format" });
     }
 
     const userDb = await getUserDb(req.token);
     if (!userDb) return res.status(401).json({ error: "Connection timed out" });
-    const result = await userDb.collection("items").deleteOne({ _id: new ObjectId(id) });
+
+    // Delete ONLY if _id matches AND uid matches the logged-in user
+    const result = await userDb.collection("items").deleteOne({
+      _id: new ObjectId(id),
+      uid: userId // <--- Critical: Security check
+    });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ success: false, message: "Item not found" });
@@ -491,9 +580,16 @@ router.delete("/items/:id", authenticateAndGetUserDb, async (req, res) => {
 
 router.get("/parts", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const userDb = await getUserDb(req.token);
+
     if (!userDb) return res.status(401).json({ error: "Connection timed out" });
-    const parts = await userDb.collection("parts").find({}).sort({ part_name: 1 }).toArray();
+
+    const parts = await userDb.collection("parts")
+      .find({ uid: userId }) // <--- Critical: Filter by User ID
+      .sort({ part_name: 1 })
+      .toArray();
+
     res.json({ success: true, parts });
   } catch (err) {
     console.error("Error fetching parts:", err);
@@ -503,7 +599,9 @@ router.get("/parts", authenticateAndGetUserDb, async (req, res) => {
 
 router.post("/parts", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const { part_name, part_price } = req.body;
+
     if (!part_name) {
       return res.status(400).json({ success: false, message: "Part name is required" });
     }
@@ -514,18 +612,25 @@ router.post("/parts", authenticateAndGetUserDb, async (req, res) => {
     const userDb = await getUserDb(req.token);
     if (!userDb) return res.status(401).json({ error: "Connection timed out" });
 
-    const existingPart = await userDb.collection("parts").findOne({ part_name });
+    // Check for duplicate ONLY within this user's data
+    const existingPart = await userDb.collection("parts").findOne({
+      uid: userId,
+      part_name: part_name
+    });
+
     if (existingPart) {
       return res.status(400).json({ success: false, message: "A part with this name already exists" });
     }
 
     const newPart = {
+      uid: userId, // <--- Critical: Tag with User ID
       part_name,
       part_price: parseFloat(part_price),
     };
 
     const result = await userDb.collection("parts").insertOne(newPart);
 
+    // Retrieve the complete inserted document to return to frontend
     const insertedPart = await userDb.collection("parts").findOne({ _id: result.insertedId });
 
     res.status(201).json({ success: true, message: "Part added successfully", part: insertedPart });
@@ -537,6 +642,7 @@ router.post("/parts", authenticateAndGetUserDb, async (req, res) => {
 
 router.put("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const { id } = req.params;
     const { part_name, part_price } = req.body;
 
@@ -552,11 +658,15 @@ router.put("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
     }
 
     const userDb = await getUserDb(req.token);
+    if (!userDb) return res.status(401).json({ error: "Connection timed out" });
 
+    // 1. Check for duplicate name ONLY within this user's data
     const existingPart = await userDb.collection("parts").findOne({
+      uid: userId, // <--- Critical: Scope check to this user
       part_name,
       _id: { $ne: new ObjectId(id) }
     });
+
     if (existingPart) {
       return res.status(400).json({ success: false, message: "Another part with this name already exists" });
     }
@@ -568,8 +678,12 @@ router.put("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
       }
     };
 
+    // 2. Update ONLY if ID matches AND it belongs to this user
     const result = await userDb.collection("parts").updateOne(
-      { _id: new ObjectId(id) },
+      {
+        _id: new ObjectId(id),
+        uid: userId // <--- Critical: Security check
+      },
       updateData
     );
 
@@ -588,6 +702,7 @@ router.put("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
 
 router.delete("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
   try {
+    const userId = req.user.userId; // from auth middleware
     const { id } = req.params;
 
     if (!ObjectId.isValid(id)) {
@@ -595,7 +710,12 @@ router.delete("/parts/:id", authenticateAndGetUserDb, async (req, res) => {
     }
 
     const userDb = await getUserDb(req.token);
-    const result = await userDb.collection("parts").deleteOne({ _id: new ObjectId(id) });
+
+    // Delete ONLY if _id matches AND uid matches the logged-in user
+    const result = await userDb.collection("parts").deleteOne({
+      _id: new ObjectId(id),
+      uid: userId // <--- Critical: Security check
+    });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ success: false, message: "Part not found" });
