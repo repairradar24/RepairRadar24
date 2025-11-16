@@ -23,6 +23,7 @@ import {
 import { AddCircle, Delete, WhatsApp } from "@mui/icons-material"; // 🟢 NEW
 import api from "../axiosConfig";
 import "./jobcarddetails.css";
+import Navbar from "../Navbar/Navbar";
 
 export default function JobCardDetails() {
   const { id } = useParams();
@@ -391,387 +392,390 @@ export default function JobCardDetails() {
   if (loading) return <div className="loading">Loading...</div>;
 
   return (
-    <div className="page-container">
-      <h2 className="title">Job Card Details</h2>
+    <>
+      <Navbar />
+      <div className="page-container">
+        <h2 className="title">Job Card Details</h2>
 
-      {/* Job Details */}
-      <div className="job-details-grid">
+        {/* Job Details */}
+        <div className="job-details-grid">
+          {schema
+            .filter((field) => field.type !== "list")
+            .map((field) => (
+              <div key={field.key} className="field-item">
+                {renderSimpleField(field, formData[field.key], (val) =>
+                  handleChange(field.key, val)
+                )}
+              </div>
+            ))}
+        </div>
+
+        {/* Items List */}
         {schema
-          .filter((field) => field.type !== "list")
+          .filter((field) => field.type === "list")
           .map((field) => (
-            <div key={field.key} className="field-item">
-              {renderSimpleField(field, formData[field.key], (val) =>
-                handleChange(field.key, val)
-              )}
-            </div>
-          ))}
-      </div>
-
-      {/* Items List */}
-      {schema
-        .filter((field) => field.type === "list")
-        .map((field) => (
-          <div key={field.key} className="list-wrapper">
-            <h4>{field.name}</h4>
-            <Paper className="list-table">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    {field.fields
-                      .filter((f) => f.type !== "list")
-                      .map((sub) => (
-                        <TableCell key={sub.key}>{sub.name}</TableCell>
-                      ))}
-                    <TableCell>Repair Cost</TableCell>
-                    <TableCell>Parts</TableCell>
-                    <TableCell>WhatsApp</TableCell> {/* 🟢 NEW */}
-                    <TableCell>Action</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(formData[field.key] || []).map((row, rowIndex) => {
-                    const statusField = field.fields.find((f) => f.key === "item_status");
-                    let rowColor = "";
-                    if (statusField && row.item_status) {
-                      const selectedOpt = statusField.options.find(
-                        (opt) => opt.value === row.item_status
-                      );
-                      if (selectedOpt?.color) rowColor = selectedOpt.color;
-                    }
-
-                    return (
-                      <TableRow
-                        key={rowIndex}
-                        style={{
-                          backgroundColor: rowColor ? rowColor + "20" : "transparent",
-                        }}
-                      >
-                        {field.fields
-                          .filter((f) => f.type !== "list")
-                          .map((sub) => (
-                            <TableCell key={sub.key}>
-                              {sub.key === "item_name" ? (
-                                <Autocomplete
-                                  freeSolo
-                                  options={savedItems.map((item) => item.item_name)}
-                                  value={row[sub.key] || ""}
-                                  onInputChange={(_, newValue) => {
-                                    handleListChange(field.key, rowIndex, sub.key, newValue || "");
-                                  }}
-                                  renderInput={(params) => (
-                                    <TextField
-                                      {...params}
-                                      label={sub.name}
-                                      margin="normal"
-                                      fullWidth
-                                      size="small"
-                                      error={!!errors[`item_${rowIndex}_name`]}
-                                      helperText={errors[`item_${rowIndex}_name`]}
-                                    />
-                                  )}
-                                />
-                              ) : (
-                                renderSimpleField(
-                                  sub,
-                                  row[sub.key],
-                                  (val) => handleListChange(field.key, rowIndex, sub.key, val)
-                                )
-                              )}
-
-                              {sub.key === "item_qty" && errors[`item_${rowIndex}_qty`] && (
-                                <span className="error-text">
-                                  {errors[`item_${rowIndex}_qty`]}
-                                </span>
-                              )}
-                            </TableCell>
-                          ))}
-                        <TableCell>₹{calculateRepairCost(row.parts || []).toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => setActiveParts({ parentKey: field.key, rowIndex })}
-                          >
-                            Parts
-                          </Button>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Checkbox
-                            checked={whatsappItems.includes(rowIndex)}
-                            onChange={() => toggleWhatsappItem(rowIndex)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <IconButton
-                            color="error"
-                            onClick={() => removeListRow(field.key, rowIndex)}
-                          >
-                            <Delete />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Paper>
-            <Button
-              startIcon={<AddCircle />}
-              onClick={() => addListRow(field.key, field.fields)}
-              className="add-row-btn"
-            >
-              Add {field.name}
-            </Button>
-          </div>
-        ))}
-
-      {/* Action Buttons */}
-      <div className="action-buttons">
-        <Button variant="contained" color="primary" onClick={handleSave} className="save-btn">
-          Save Changes
-        </Button>
-
-        {/* 🟢 WhatsApp Button */}
-        <Button
-          disabled={whatsappItems.length === 0}
-          variant="contained"
-          color="success"
-          startIcon={<WhatsApp />}
-          onClick={() => {
-            fetchWhatsappMessages();
-            setWhatsappModalOpen(true);
-          }}
-        >
-          WhatsApp
-        </Button>
-
-        <Button
-          variant="contained"
-          color="secondary"
-          onClick={() => navigate("/dashboard")}
-          className="save-btn"
-        >
-          Discard
-        </Button>
-      </div>
-
-      {/* WhatsApp Modal 🟢 */}
-      <Modal open={whatsappModalOpen} onClose={() => setWhatsappModalOpen(false)}>
-        <Box className="modal-box">
-          <Typography variant="h6" gutterBottom>
-            Send WhatsApp Message
-          </Typography>
-          {whatsappMessages.length === 0 ? (
-            <Typography>No messages available.</Typography>
-          ) : (
-            <List>
-              {whatsappMessages.map((msg) => (
-                <Button
-                  key={msg._id}
-                  variant="contained"
-                  color="primary"
-                  onClick={async () => {
-                    const phone = formData.customer_phone;
-                    if (!phone) {
-                      alert("No customer phone found.");
-                      return;
-                    }
-
-                    const rawTemplate = msg.text || msg.message || "";
-                    const finalMessage = generateWhatsappMessage(rawTemplate, formData, whatsappItems);
-                    try {
-                      await navigator.clipboard.writeText(finalMessage);
-                      console.log("WhatsApp message copied to clipboard!");
-                    } catch (err) {
-                      console.error("Failed to copy message:", err);
-                    }
-
-                    const encoded = encodeURIComponent(finalMessage.trim());
-                    const whatsappUrl = `https://wa.me/91${phone}?text=${encoded}`;
-                    window.open(whatsappUrl, "_blank");
-                  }}
-                  sx={{
-                    textTransform: "none",
-                    borderRadius: "12px",
-                    m: 0.5,
-                    px: 2,
-                    py: 1,
-                    minWidth: "120px",
-                    boxShadow: 1,
-                    backgroundColor: "#25D366",
-                    "&:hover": {
-                      backgroundColor: "#1EBE57",
-                    },
-                  }}
-                >
-                  {msg.name || "Message"}
-                </Button>
-
-              ))}
-            </List>
-          )}
-          <div className="modal-actions">
-            <Button variant="contained" onClick={() => setWhatsappModalOpen(false)}>
-              Close
-            </Button>
-          </div>
-        </Box>
-      </Modal>
-
-      {/* Parts Modal (unchanged) */}
-      <Modal open={!!activeParts} onClose={() => setActiveParts(null)}>
-        <Box className="modal-box">
-          <Typography variant="h6">Parts</Typography>
-          {activeParts && (
-            <>
+            <div key={field.key} className="list-wrapper">
+              <h4>{field.name}</h4>
               <Paper className="list-table">
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Part Name</TableCell>
-                      <TableCell>Qty</TableCell>
-                      <TableCell>Price</TableCell>
+                      {field.fields
+                        .filter((f) => f.type !== "list")
+                        .map((sub) => (
+                          <TableCell key={sub.key}>{sub.name}</TableCell>
+                        ))}
+                      <TableCell>Repair Cost</TableCell>
+                      <TableCell>Parts</TableCell>
+                      <TableCell>WhatsApp</TableCell> {/* 🟢 NEW */}
                       <TableCell>Action</TableCell>
                     </TableRow>
                   </TableHead>
-
                   <TableBody>
-                    {(formData[activeParts.parentKey]?.[activeParts.rowIndex].parts || []).map(
-                      (p, idx) => (
-                        <TableRow key={idx}>
-                          {/* Part Name */}
+                    {(formData[field.key] || []).map((row, rowIndex) => {
+                      const statusField = field.fields.find((f) => f.key === "item_status");
+                      let rowColor = "";
+                      if (statusField && row.item_status) {
+                        const selectedOpt = statusField.options.find(
+                          (opt) => opt.value === row.item_status
+                        );
+                        if (selectedOpt?.color) rowColor = selectedOpt.color;
+                      }
+
+                      return (
+                        <TableRow
+                          key={rowIndex}
+                          style={{
+                            backgroundColor: rowColor ? rowColor + "20" : "transparent",
+                          }}
+                        >
+                          {field.fields
+                            .filter((f) => f.type !== "list")
+                            .map((sub) => (
+                              <TableCell key={sub.key}>
+                                {sub.key === "item_name" ? (
+                                  <Autocomplete
+                                    freeSolo
+                                    options={savedItems.map((item) => item.item_name)}
+                                    value={row[sub.key] || ""}
+                                    onInputChange={(_, newValue) => {
+                                      handleListChange(field.key, rowIndex, sub.key, newValue || "");
+                                    }}
+                                    renderInput={(params) => (
+                                      <TextField
+                                        {...params}
+                                        label={sub.name}
+                                        margin="normal"
+                                        fullWidth
+                                        size="small"
+                                        error={!!errors[`item_${rowIndex}_name`]}
+                                        helperText={errors[`item_${rowIndex}_name`]}
+                                      />
+                                    )}
+                                  />
+                                ) : (
+                                  renderSimpleField(
+                                    sub,
+                                    row[sub.key],
+                                    (val) => handleListChange(field.key, rowIndex, sub.key, val)
+                                  )
+                                )}
+
+                                {sub.key === "item_qty" && errors[`item_${rowIndex}_qty`] && (
+                                  <span className="error-text">
+                                    {errors[`item_${rowIndex}_qty`]}
+                                  </span>
+                                )}
+                              </TableCell>
+                            ))}
+                          <TableCell>₹{calculateRepairCost(row.parts || []).toFixed(2)}</TableCell>
                           <TableCell>
-                            <Autocomplete
-                              freeSolo
-                              options={savedParts.map((part) => part.part_name)}
-                              value={p.name || ""}
-                              onInputChange={(_, newValue) => {
-                                const newPartName = newValue || "";
-
-                                const foundPart = savedParts.find(
-                                  (sp) => sp.part_name === newPartName
-                                );
-
-                                const updated = [...formData[activeParts.parentKey]];
-                                const currentPart = updated[activeParts.rowIndex].parts[idx];
-
-                                currentPart.name = newPartName;
-
-                                if (foundPart) {
-                                  currentPart.price = foundPart.part_price;
-                                }
-
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  [activeParts.parentKey]: updated,
-                                }));
-                              }}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  size="small"
-                                  label="Part Name"
-                                  error={!!errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
-                                  helperText={errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
-                                />
-                              )}
-                            />
-                          </TableCell>
-
-                          {/* Qty */}
-                          <TableCell>
-                            <TextField
-                              type="number"
-                              value={p.qty || 1}
-                              onChange={(e) => {
-                                const updated = [...formData[activeParts.parentKey]];
-                                updated[activeParts.rowIndex].parts[idx] = {
-                                  ...p,
-                                  qty: e.target.value,
-                                };
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  [activeParts.parentKey]: updated,
-                                }));
-                              }}
+                            <Button
+                              variant="outlined"
                               size="small"
+                              onClick={() => setActiveParts({ parentKey: field.key, rowIndex })}
+                            >
+                              Parts
+                            </Button>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Checkbox
+                              checked={whatsappItems.includes(rowIndex)}
+                              onChange={() => toggleWhatsappItem(rowIndex)}
                             />
                           </TableCell>
-
-                          {/* Price */}
-                          <TableCell>
-                            <TextField
-                              type="number"
-                              value={p.price == null ? "" : p.price}
-                              onChange={(e) => {
-                                const updated = [...formData[activeParts.parentKey]];
-                                updated[activeParts.rowIndex].parts[idx] = {
-                                  ...p,
-                                  price: e.target.value,
-                                };
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  [activeParts.parentKey]: updated,
-                                }));
-                              }}
-                              size="small"
-                            />
-                          </TableCell>
-
-                          {/* Delete */}
                           <TableCell>
                             <IconButton
                               color="error"
-                              onClick={() => {
-                                const updated = [...formData[activeParts.parentKey]];
-                                updated[activeParts.rowIndex].parts =
-                                  updated[activeParts.rowIndex].parts.filter((_, i) => i !== idx);
-
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  [activeParts.parentKey]: updated,
-                                }));
-                              }}
+                              onClick={() => removeListRow(field.key, rowIndex)}
                             >
                               <Delete />
                             </IconButton>
                           </TableCell>
-
                         </TableRow>
-                      )
-                    )}
+                      );
+                    })}
                   </TableBody>
-
                 </Table>
               </Paper>
-              {partsErrors && <span className="error-text">{partsErrors}</span>}
               <Button
                 startIcon={<AddCircle />}
-                onClick={() => {
-                  const updated = [...formData[activeParts.parentKey]];
-                  const currentParts = updated[activeParts.rowIndex].parts || [];
-                  updated[activeParts.rowIndex].parts = [
-                    ...currentParts,
-                    { name: "", qty: 1, price: 0 },
-                  ];
-                  setFormData((prev) => ({
-                    ...prev,
-                    [activeParts.parentKey]: updated,
-                  }));
-                }}
+                onClick={() => addListRow(field.key, field.fields)}
                 className="add-row-btn"
               >
-                Add Part
+                Add {field.name}
               </Button>
-              <div className="modal-actions">
-                <Button variant="contained" onClick={handlePartsDone}>
-                  Done
+            </div>
+          ))}
+
+        {/* Action Buttons */}
+        <div className="action-buttons">
+          <Button variant="contained" color="primary" onClick={handleSave} className="save-btn">
+            Save Changes
+          </Button>
+
+          {/* 🟢 WhatsApp Button */}
+          <Button
+            disabled={whatsappItems.length === 0}
+            variant="contained"
+            color="success"
+            startIcon={<WhatsApp />}
+            onClick={() => {
+              fetchWhatsappMessages();
+              setWhatsappModalOpen(true);
+            }}
+          >
+            WhatsApp
+          </Button>
+
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => navigate("/dashboard")}
+            className="save-btn"
+          >
+            Discard
+          </Button>
+        </div>
+
+        {/* WhatsApp Modal 🟢 */}
+        <Modal open={whatsappModalOpen} onClose={() => setWhatsappModalOpen(false)}>
+          <Box className="modal-box">
+            <Typography variant="h6" gutterBottom>
+              Send WhatsApp Message
+            </Typography>
+            {whatsappMessages.length === 0 ? (
+              <Typography>No messages available.</Typography>
+            ) : (
+              <List>
+                {whatsappMessages.map((msg) => (
+                  <Button
+                    key={msg._id}
+                    variant="contained"
+                    color="primary"
+                    onClick={async () => {
+                      const phone = formData.customer_phone;
+                      if (!phone) {
+                        alert("No customer phone found.");
+                        return;
+                      }
+
+                      const rawTemplate = msg.text || msg.message || "";
+                      const finalMessage = generateWhatsappMessage(rawTemplate, formData, whatsappItems);
+                      try {
+                        await navigator.clipboard.writeText(finalMessage);
+                        console.log("WhatsApp message copied to clipboard!");
+                      } catch (err) {
+                        console.error("Failed to copy message:", err);
+                      }
+
+                      const encoded = encodeURIComponent(finalMessage.trim());
+                      const whatsappUrl = `https://wa.me/91${phone}?text=${encoded}`;
+                      window.open(whatsappUrl, "_blank");
+                    }}
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "12px",
+                      m: 0.5,
+                      px: 2,
+                      py: 1,
+                      minWidth: "120px",
+                      boxShadow: 1,
+                      backgroundColor: "#25D366",
+                      "&:hover": {
+                        backgroundColor: "#1EBE57",
+                      },
+                    }}
+                  >
+                    {msg.name || "Message"}
+                  </Button>
+
+                ))}
+              </List>
+            )}
+            <div className="modal-actions">
+              <Button variant="contained" onClick={() => setWhatsappModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </Box>
+        </Modal>
+
+        {/* Parts Modal (unchanged) */}
+        <Modal open={!!activeParts} onClose={() => setActiveParts(null)}>
+          <Box className="modal-box">
+            <Typography variant="h6">Parts</Typography>
+            {activeParts && (
+              <>
+                <Paper className="list-table">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Part Name</TableCell>
+                        <TableCell>Qty</TableCell>
+                        <TableCell>Price</TableCell>
+                        <TableCell>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+
+                    <TableBody>
+                      {(formData[activeParts.parentKey]?.[activeParts.rowIndex].parts || []).map(
+                        (p, idx) => (
+                          <TableRow key={idx}>
+                            {/* Part Name */}
+                            <TableCell>
+                              <Autocomplete
+                                freeSolo
+                                options={savedParts.map((part) => part.part_name)}
+                                value={p.name || ""}
+                                onInputChange={(_, newValue) => {
+                                  const newPartName = newValue || "";
+
+                                  const foundPart = savedParts.find(
+                                    (sp) => sp.part_name === newPartName
+                                  );
+
+                                  const updated = [...formData[activeParts.parentKey]];
+                                  const currentPart = updated[activeParts.rowIndex].parts[idx];
+
+                                  currentPart.name = newPartName;
+
+                                  if (foundPart) {
+                                    currentPart.price = foundPart.part_price;
+                                  }
+
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    [activeParts.parentKey]: updated,
+                                  }));
+                                }}
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    size="small"
+                                    label="Part Name"
+                                    error={!!errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
+                                    helperText={errors[`item_${activeParts.rowIndex}_part_${idx}_name`]}
+                                  />
+                                )}
+                              />
+                            </TableCell>
+
+                            {/* Qty */}
+                            <TableCell>
+                              <TextField
+                                type="number"
+                                value={p.qty || 1}
+                                onChange={(e) => {
+                                  const updated = [...formData[activeParts.parentKey]];
+                                  updated[activeParts.rowIndex].parts[idx] = {
+                                    ...p,
+                                    qty: e.target.value,
+                                  };
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    [activeParts.parentKey]: updated,
+                                  }));
+                                }}
+                                size="small"
+                              />
+                            </TableCell>
+
+                            {/* Price */}
+                            <TableCell>
+                              <TextField
+                                type="number"
+                                value={p.price == null ? "" : p.price}
+                                onChange={(e) => {
+                                  const updated = [...formData[activeParts.parentKey]];
+                                  updated[activeParts.rowIndex].parts[idx] = {
+                                    ...p,
+                                    price: e.target.value,
+                                  };
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    [activeParts.parentKey]: updated,
+                                  }));
+                                }}
+                                size="small"
+                              />
+                            </TableCell>
+
+                            {/* Delete */}
+                            <TableCell>
+                              <IconButton
+                                color="error"
+                                onClick={() => {
+                                  const updated = [...formData[activeParts.parentKey]];
+                                  updated[activeParts.rowIndex].parts =
+                                    updated[activeParts.rowIndex].parts.filter((_, i) => i !== idx);
+
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    [activeParts.parentKey]: updated,
+                                  }));
+                                }}
+                              >
+                                <Delete />
+                              </IconButton>
+                            </TableCell>
+
+                          </TableRow>
+                        )
+                      )}
+                    </TableBody>
+
+                  </Table>
+                </Paper>
+                {partsErrors && <span className="error-text">{partsErrors}</span>}
+                <Button
+                  startIcon={<AddCircle />}
+                  onClick={() => {
+                    const updated = [...formData[activeParts.parentKey]];
+                    const currentParts = updated[activeParts.rowIndex].parts || [];
+                    updated[activeParts.rowIndex].parts = [
+                      ...currentParts,
+                      { name: "", qty: 1, price: 0 },
+                    ];
+                    setFormData((prev) => ({
+                      ...prev,
+                      [activeParts.parentKey]: updated,
+                    }));
+                  }}
+                  className="add-row-btn"
+                >
+                  Add Part
                 </Button>
-              </div>
-            </>
-          )}
-        </Box>
-      </Modal>
-    </div>
+                <div className="modal-actions">
+                  <Button variant="contained" onClick={handlePartsDone}>
+                    Done
+                  </Button>
+                </div>
+              </>
+            )}
+          </Box>
+        </Modal>
+      </div>
+    </>
   );
 }
