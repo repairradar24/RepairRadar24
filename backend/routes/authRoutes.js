@@ -1,4 +1,3 @@
-// routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
 const { getMainDb } = require('../config/mainDb');
@@ -6,7 +5,20 @@ const { connectUserDb } = require('../config/userDb');
 const { ObjectId } = require("mongodb");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = 'repairradar_secret_key'; // Replace with secure key or use .env in production
+
+require('dotenv').config();
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const DEFAULT_USER_DB_URL = process.env.DEFAULT_USER_DB_URL;
+
+if (!JWT_SECRET) {
+  console.error("FATAL ERROR: JWT_SECRET is not defined in .env file");
+  process.exit(1); // Stop the server if the secret is missing
+}
+if (!DEFAULT_USER_DB_URL) {
+  console.error("FATAL ERROR: DEFAULT_USER_DB_URL is not defined in .env file");
+  process.exit(1); // Stop the server if the secret is missing
+}
 
 // POST /api/signup
 router.post('/signup', async (req, res) => {
@@ -32,7 +44,7 @@ router.post('/signup', async (req, res) => {
       email,
       password: hashedPassword,
       validity: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days free validity in milliseconds
-      dbUrl: "",
+      dbUrl: DEFAULT_USER_DB_URL,
       schemaConfigured: false
     });
 

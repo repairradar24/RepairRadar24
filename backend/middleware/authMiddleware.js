@@ -2,7 +2,14 @@
 const jwt = require('jsonwebtoken');
 const { getUserDb } = require('../config/userDb');
 
-const JWT_SECRET = "repairradar_secret_key"; // You can hardcode for now
+require('dotenv').config();
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error("FATAL ERROR: JWT_SECRET is not defined in .env file");
+  process.exit(1); // Stop the server if the secret is missing
+}
 
 function authenticateAndGetUserDb(req, res, next) {
   // console.log(req);
