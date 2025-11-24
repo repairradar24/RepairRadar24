@@ -32,6 +32,31 @@ const deepSearch = (obj, word) => {
   return false;
 };
 
+// ✅ Generic retry helper: retry on 401 until success or timeout
+const retryWithTimeout = async (fn, timeoutMs = 5000, intervalMs = 300) => {
+  const start = Date.now();
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      // Try the actual call
+      const result = await fn();
+      return result; // success → exit
+    } catch (err) {
+      const status = err?.response?.status;
+
+      // If it's NOT 401 or we've crossed timeout, rethrow and stop retrying
+      const elapsed = Date.now() - start;
+      if (status !== 401 || elapsed >= timeoutMs) {
+        throw err;
+      }
+
+      // Otherwise, wait a bit and retry
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+};
+
 export default function Dashboard() {
   const [jobs, setJobs] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,18 +71,39 @@ export default function Dashboard() {
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
+  // Token as state (so effects can wait for it)
+  const [token, setToken] = useState(null);
+
   const navigate = useNavigate();
-  const token = sessionStorage.getItem("token");
+
+  // 0. Read token & plan info from sessionStorage once on mount
+  useEffect(() => {
+    const storedToken = sessionStorage.getItem("token");
+    const hasPlanExpired = sessionStorage.getItem("isPlanExpired") === "true";
+
+    if (!storedToken) {
+      alert("You are not logged in. Please sign in.");
+      navigate("/");
+      return;
+    }
+
+    setToken(storedToken);
+    setIsPlanExpired(hasPlanExpired);
+  }, [navigate]);
 
   // 1. Fetch User Configuration (Schema)
   useEffect(() => {
-    if (!token) return;
+    if (!token) return; // wait until token is available
 
     const fetchConfig = async () => {
       try {
-        const res = await api.get("/user/get-config", {
-          headers: { authorization: `Bearer ${token}` },
-        });
+        const res = await retryWithTimeout(
+          () =>
+            api.get("/user/get-config", {
+              headers: { authorization: `Bearer ${token}` },
+            }),
+          5000 // 5 seconds timeout window
+        );
 
         if (res.status === 200 && res.data && res.data.schema) {
           // Find the 'jobcard_status' field in the schema
@@ -72,14 +118,14 @@ export default function Dashboard() {
             const defaults = statusField.options
               .filter((opt) => opt.displayByDefault)
               .map((opt) => opt.value);
-            
+
             setSelectedStatuses(defaults);
           }
         }
-        setIsConfigLoaded(true);
       } catch (err) {
-        console.error("Error fetching config:", err);
-        setIsConfigLoaded(true); 
+        console.error("Error fetching config (even after retry):", err);
+      } finally {
+        setIsConfigLoaded(true);
       }
     };
 
@@ -88,50 +134,47 @@ export default function Dashboard() {
 
   // 2. Fetch Jobs (Data)
   useEffect(() => {
-    if (!token) {
-      alert("You are not logged in. Please sign in.");
-      navigate("/");
-      return;
-    }
-    const hasPlanExpired = sessionStorage.getItem("isPlanExpired") === "true";
-    setIsPlanExpired(hasPlanExpired);
+    if (!token) return; // don't call APIs until token is set
 
-    const fetchInitialData = async (isRetry = false) => {
+    const fetchInitialData = async () => {
       try {
-        const countRes = await api.get("/user/jobs/count", {
-          headers: { authorization: `Bearer ${token}` },
-        });
+        const countRes = await retryWithTimeout(
+          () =>
+            api.get("/user/jobs/count", {
+              headers: { authorization: `Bearer ${token}` },
+            }),
+          5000 // 5s retry window
+        );
 
         if (countRes.data?.total !== undefined) {
           setTotalJobs(countRes.data.total);
           if (countRes.data.total > 0) {
-            await fetchJobs(0);
+            await fetchJobs(0, token);
           }
         }
       } catch (err) {
-        const status = err.response?.status;
-        console.error("Error fetching initial data:", err);
-
-        if (status === 401 && !isRetry) {
-          setTimeout(() => fetchInitialData(true), 500);
-        } else if (!isRetry) {
-          setTimeout(() => fetchInitialData(true), 500);
-        } else {
-          navigate("/");
-        }
+        console.error("Error fetching initial data (even after retry):", err);
+        // If after retries it's still failing, you can choose to navigate out:
+        // navigate("/");
       }
     };
 
     fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, token]);
+  }, [token]);
 
-  const fetchJobs = async (pageNum) => {
+  const fetchJobs = async (pageNum, currentToken = token) => {
+    if (!currentToken) return;
+
     setLoading(true);
     try {
-      const res = await api.get(
-        `/user/jobs/getjobcards?offset=${pageNum * 20}&limit=20`,
-        { headers: { authorization: `Bearer ${token}` } }
+      const res = await retryWithTimeout(
+        () =>
+          api.get(
+            `/user/jobs/getjobcards?offset=${pageNum * 20}&limit=20`,
+            { headers: { authorization: `Bearer ${currentToken}` } }
+          ),
+        5000 // retry for this request as well
       );
 
       if (res.data && res.data.jobs) {
@@ -146,7 +189,7 @@ export default function Dashboard() {
         setHasMore(totalFetched < totalJobs);
       }
     } catch (err) {
-      console.error("Error fetching jobs:", err);
+      console.error("Error fetching jobs (even after retry):", err);
     } finally {
       setLoading(false);
     }
@@ -191,7 +234,7 @@ export default function Dashboard() {
       <Navbar />
 
       <div className="job-summary-section">
-        {/* CHANGED: Showing filteredJobs.length instead of totalJobs */}
+        {/* Showing filteredJobs.length instead of totalJobs */}
         <p className="job-summary">
           Displayed Jobs: <b>{filteredJobs.length}</b>
         </p>
@@ -225,11 +268,14 @@ export default function Dashboard() {
       </div>
 
       {/* --- Dynamic Status Filter Section --- */}
-      <div className="status-filter-section" style={{ padding: "0 20px", marginBottom: "15px" }}>
+      <div
+        className="status-filter-section"
+        style={{ padding: "0 20px", marginBottom: "15px" }}
+      >
         {!isConfigLoaded ? (
-           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-             <CircularProgress size={20} /> <small>Loading filters...</small>
-           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <CircularProgress size={20} /> <small>Loading filters...</small>
+          </div>
         ) : (
           <FormGroup row>
             {statusOptions.map((option) => (
@@ -240,9 +286,9 @@ export default function Dashboard() {
                     checked={selectedStatuses.includes(option.value)}
                     onChange={() => handleStatusChange(option.value)}
                     sx={{
-                      color: option.color || '#1976d2',
-                      '&.Mui-checked': {
-                        color: option.color || '#1976d2',
+                      color: option.color || "#1976d2",
+                      "&.Mui-checked": {
+                        color: option.color || "#1976d2",
                       },
                     }}
                   />
@@ -257,28 +303,39 @@ export default function Dashboard() {
       <div className="job-cards">
         {filteredJobs.length > 0 ? (
           filteredJobs.map((job) => {
-            const statusConfig = statusOptions.find(o => o.value === job.jobcard_status);
-            const statusColor = statusConfig?.color || '#ccc';
+            const statusConfig = statusOptions.find(
+              (o) => o.value === job.jobcard_status
+            );
+            const statusColor = statusConfig?.color || "#ccc";
 
             return (
-              <div 
-                key={job._id} 
-                className="job-card" 
+              <div
+                key={job._id}
+                className="job-card"
                 style={{ borderLeft: `5px solid ${statusColor}` }}
               >
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <h3>Job #{job.job_no || "-"}</h3>
-                  <span className="badge" style={{
+                  <span
+                    className="badge"
+                    style={{
                       backgroundColor: statusColor,
-                      color: 'white',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem'
-                  }}>
+                      color: "white",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      fontSize: "0.8rem",
+                    }}
+                  >
                     {job.jobcard_status}
                   </span>
                 </div>
-                
+
                 <p>
                   <b>Customer:</b> {job.customer_name || "-"}
                 </p>

@@ -59,10 +59,37 @@ const defaultConfig = [
     },
 ];
 
+// 🔹 Cookie helpers
+const setCookie = (name, value, days) => {
+    const date = new Date();
+    date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+    const expires = "expires=" + date.toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)};${expires};path=/`;
+};
+
+const getCookie = (name) => {
+    const decodedCookie = decodeURIComponent(document.cookie || "");
+    const ca = decodedCookie.split(";");
+    const cookieName = name + "=";
+    for (let c of ca) {
+        c = c.trim();
+        if (c.indexOf(cookieName) === 0) {
+            return c.substring(cookieName.length, c.length);
+        }
+    }
+    return "";
+};
+
 export default function SignIn() {
     const navigate = useNavigate();
+
+    // 🔹 Initialize email from cookie; password left empty
+    const [signInData, setSignInData] = useState(() => ({
+        email: getCookie("rememberEmail") || "",
+        password: "",
+    }));
+
     const [isSignUp, setIsSignUp] = useState(false);
-    const [signInData, setSignInData] = useState({ email: "hetvik1@gmail.com", password: "hetvik123" });
     const [signUpData, setSignUpData] = useState({ name: "", email: "", password: "" });
     const [error, setError] = useState("");
 
@@ -101,6 +128,9 @@ export default function SignIn() {
 
                     const token = resp.data.token;
 
+                    // 🔹 Store email in long-lived cookie (1 year)
+                    setCookie("rememberEmail", signInData.email, 365);
+
                     if (!resp.data.schemaConfigured) {
                         try {
                             await api.post(
@@ -112,7 +142,8 @@ export default function SignIn() {
                             navigate("/dashboard");
                         } catch (configErr) {
                             console.error("Failed to save default config:", configErr);
-                            const configErrorMessage = "Sign in successful, but failed to save default settings. Please contact support.";
+                            const configErrorMessage =
+                                "Sign in successful, but failed to save default settings. Please contact support.";
                             setError(configErrorMessage);
                             toast.error(configErrorMessage);
                         }
