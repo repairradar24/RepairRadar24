@@ -1135,7 +1135,7 @@ const Settings = () => {
                                             savedParts.map((part) => (
                                                 <tr key={part._id}>
                                                     <td>{part.part_name}</td>
-                                                    <td>₹{part.part_price.toFixed(2)}</td>
+                                                    <td>₹{part.part_price}</td>
                                                     <td>
                                                         <button
                                                             className="icon-btn"
