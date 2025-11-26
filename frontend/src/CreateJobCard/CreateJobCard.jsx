@@ -47,12 +47,6 @@ const deepSearch = (obj, word) => {
 
 /**
  * ConfirmDialog component + askConfirm helper
- *
- * Usage:
- *   const confirmed = await askConfirm("Are you sure?");
- *   if (confirmed) { ... }
- *
- * Implementation: askConfirm returns a Promise<boolean>.
  */
 const ConfirmDialog = ({ open, message, onClose }) => {
   return (
@@ -129,7 +123,32 @@ export default function CreateJobCard() {
             } else if (f.type === "checkbox") {
               defaults[f.key] = false;
             } else if (f.type === "list") {
-              defaults[f.key] = [];
+              // --- CHANGED LOGIC START ---
+              // Automatically add one empty row for list types (like Items)
+              const firstRow = {};
+              if (f.fields && f.fields.length > 0) {
+                f.fields.forEach((subF) => {
+                  if (subF.key.toLowerCase().includes("qty")) {
+                    firstRow[subF.key] = 1;
+                  } else if (subF.key.toLowerCase().includes("price")) {
+                    firstRow[subF.key] = 0;
+                  } else if (subF.type === "dropdown" && subF.options?.length) {
+                    firstRow[subF.key] = subF.options[0].value;
+                  } else if (subF.type === "checkbox") {
+                    firstRow[subF.key] = false;
+                  } else if (subF.type === "list") {
+                    // Nested lists (like Parts) should remain empty initially
+                    firstRow[subF.key] = [];
+                  } else {
+                    firstRow[subF.key] = "";
+                  }
+                });
+                // Initialize the list with this single empty row
+                defaults[f.key] = [firstRow];
+              } else {
+                defaults[f.key] = [];
+              }
+              // --- CHANGED LOGIC END ---
             } else {
               defaults[f.key] = "";
             }
@@ -149,7 +168,9 @@ export default function CreateJobCard() {
       .finally(() => setLoading(false));
 
     api
-      .get("/user/customerdetails", { headers: { authorization: `Bearer ${token}` } })
+      .get("/user/customerdetails", {
+        headers: { authorization: `Bearer ${token}` },
+      })
       .then((res) => {
         if (res.data.success) setCustomerDetails(res.data.customers);
       })
@@ -254,14 +275,24 @@ export default function CreateJobCard() {
           <Autocomplete
             options={field.options || []}
             value={
-              value ? field.options.find((opt) => opt.value === value) || null : field.options[0] || null
+              value
+                ? field.options.find((opt) => opt.value === value) || null
+                : field.options[0] || null
             }
             getOptionLabel={(opt) => opt.value || ""}
             isOptionEqualToValue={(opt, val) => opt.value === val.value}
-            onChange={(_, newVal) => onChange(newVal ? newVal.value : field.options[0]?.value || "")}
+            onChange={(_, newVal) =>
+              onChange(newVal ? newVal.value : field.options[0]?.value || "")
+            }
             disabled={isPlanExpired}
             renderInput={(params) => (
-              <TextField {...params} label={field.name} margin="normal" fullWidth size="small" />
+              <TextField
+                {...params}
+                label={field.name}
+                margin="normal"
+                fullWidth
+                size="small"
+              />
             )}
           />
         );
@@ -270,7 +301,11 @@ export default function CreateJobCard() {
         return (
           <div className="switch-row">
             <span>{field.name}</span>
-            <Switch checked={!!value} onChange={(e) => onChange(e.target.checked)} disabled={isPlanExpired} />
+            <Switch
+              checked={!!value}
+              onChange={(e) => onChange(e.target.checked)}
+              disabled={isPlanExpired}
+            />
           </div>
         );
 
@@ -280,7 +315,9 @@ export default function CreateJobCard() {
   };
 
   const handleCustomerNameChange = (event, value) => {
-    const found = customerDetails.find((c) => c.customer_name.toLowerCase() === (value || "").toLowerCase());
+    const found = customerDetails.find(
+      (c) => c.customer_name.toLowerCase() === (value || "").toLowerCase()
+    );
 
     setFormData((prev) => {
       let updated = { ...prev, customer_name: value || "" };
@@ -340,7 +377,9 @@ export default function CreateJobCard() {
         }
         if (!item.item_qty || item.item_qty <= 0) {
           newErrors[`qty-${idx}`] = "Quantity must be greater than 0";
-          alertMessages.push(`Quantity must be greater than 0 in row ${idx + 1}`);
+          alertMessages.push(
+            `Quantity must be greater than 0 in row ${idx + 1}`
+          );
         }
       });
     }
@@ -367,7 +406,9 @@ export default function CreateJobCard() {
         navigate("/");
         return;
       } else if (err.response?.status === 403) {
-        toast.error("Cannot create new Jobcard. Your subscription may have expired.");
+        toast.error(
+          "Cannot create new Jobcard. Your subscription may have expired."
+        );
         navigate("/settings");
         return;
       }
@@ -388,7 +429,10 @@ export default function CreateJobCard() {
       return {
         ...part,
         name: part.name ? part.name.trim() : "",
-        qty: part.qty === "" || part.qty === undefined || part.qty === null ? 1 : Number(part.qty),
+        qty:
+          part.qty === "" || part.qty === undefined || part.qty === null
+            ? 1
+            : Number(part.qty),
         price:
           part.price === "" || part.price === undefined || part.price === null
             ? 0
@@ -425,12 +469,17 @@ export default function CreateJobCard() {
         </Typography>
 
         {isPlanExpired && (
-          <div className="plan-status status-expired" style={{ marginBottom: "20px" }}>
+          <div
+            className="plan-status status-expired"
+            style={{ marginBottom: "20px" }}
+          >
             <span style={{ fontSize: "1.5rem", marginRight: "15px" }}>⚠️</span>
             <div>
-              <strong>Your plan has expired.</strong> You cannot create new job cards.
+              <strong>Your plan has expired.</strong> You cannot create new job
+              cards.
               <br />
-              Please go to <strong>Settings &gt; Subscription Plans</strong> to renew.
+              Please go to <strong>Settings &gt; Subscription Plans</strong> to
+              renew.
             </div>
           </div>
         )}
@@ -491,8 +540,12 @@ export default function CreateJobCard() {
               )
               .map((field) => (
                 <Grid item xs={12} sm={6} md={4} key={field.key}>
-                  {renderSimpleField(field, formData[field.key], (val) => handleChange(field.key, val))}
-                  {errors[field.key] && <span className="error-text">{errors[field.key]}</span>}
+                  {renderSimpleField(field, formData[field.key], (val) =>
+                    handleChange(field.key, val)
+                  )}
+                  {errors[field.key] && (
+                    <span className="error-text">{errors[field.key]}</span>
+                  )}
                 </Grid>
               ))}
           </Grid>
@@ -520,10 +573,14 @@ export default function CreateJobCard() {
                   </TableHead>
                   <TableBody>
                     {(formData[field.key] || []).map((row, rowIndex) => {
-                      const itemStatusField = field.fields.find((f) => f.key === "item_status");
+                      const itemStatusField = field.fields.find(
+                        (f) => f.key === "item_status"
+                      );
                       let rowColor = "";
                       if (itemStatusField && row.item_status) {
-                        const selectedOpt = itemStatusField.options.find((opt) => opt.value === row.item_status);
+                        const selectedOpt = itemStatusField.options.find(
+                          (opt) => opt.value === row.item_status
+                        );
                         if (selectedOpt?.color) {
                           rowColor = selectedOpt.color;
                         }
@@ -533,7 +590,9 @@ export default function CreateJobCard() {
                         <TableRow
                           key={rowIndex}
                           style={{
-                            backgroundColor: rowColor ? rowColor + "20" : "transparent",
+                            backgroundColor: rowColor
+                              ? rowColor + "20"
+                              : "transparent",
                           }}
                         >
                           {field.fields
@@ -547,7 +606,12 @@ export default function CreateJobCard() {
                                     options={savedItems.map((i) => i.item_name)}
                                     value={row[sub.key] || ""}
                                     onInputChange={(_, newValue) => {
-                                      handleListChange(field.key, rowIndex, sub.key, newValue || "");
+                                      handleListChange(
+                                        field.key,
+                                        rowIndex,
+                                        sub.key,
+                                        newValue || ""
+                                      );
                                     }}
                                     renderInput={(params) => (
                                       <TextField
@@ -562,21 +626,36 @@ export default function CreateJobCard() {
                                     )}
                                   />
                                 ) : (
-                                  renderSimpleField(sub, row[sub.key], (val) =>
-                                    handleListChange(field.key, rowIndex, sub.key, val)
+                                  renderSimpleField(
+                                    sub,
+                                    row[sub.key],
+                                    (val) =>
+                                      handleListChange(
+                                        field.key,
+                                        rowIndex,
+                                        sub.key,
+                                        val
+                                      )
                                   )
                                 )}
-                                {sub.key === "item_qty" && errors[`qty-${rowIndex}`] && (
-                                  <span className="error-text">{errors[`qty-${rowIndex}`]}</span>
-                                )}
+                                {sub.key === "item_qty" &&
+                                  errors[`qty-${rowIndex}`] && (
+                                    <span className="error-text">
+                                      {errors[`qty-${rowIndex}`]}
+                                    </span>
+                                  )}
                               </TableCell>
                             ))}
-                          <TableCell>₹{calculateRepairCost(row.parts || []).toFixed(2)}</TableCell>
+                          <TableCell>
+                            ₹{calculateRepairCost(row.parts || []).toFixed(2)}
+                          </TableCell>
                           <TableCell>
                             <Button
                               variant="outlined"
                               size="small"
-                              onClick={() => setActiveParts({ parentKey: field.key, rowIndex })}
+                              onClick={() =>
+                                setActiveParts({ parentKey: field.key, rowIndex })
+                              }
                               disabled={isPlanExpired}
                             >
                               Parts
@@ -597,13 +676,24 @@ export default function CreateJobCard() {
                   </TableBody>
                 </Table>
               </div>
-              <Button startIcon={<AddCircle />} onClick={() => addListRow(field.key, field.fields)} className="add-row-btn" disabled={isPlanExpired}>
+              <Button
+                startIcon={<AddCircle />}
+                onClick={() => addListRow(field.key, field.fields)}
+                className="add-row-btn"
+                disabled={isPlanExpired}
+              >
                 Add {field.name}
               </Button>
             </Paper>
           ))}
 
-        <Button variant="contained" color="primary" onClick={handleSave} className="save-job-btn" disabled={isPlanExpired}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSave}
+          className="save-job-btn"
+          disabled={isPlanExpired}
+        >
           Save Job
         </Button>
 
@@ -625,7 +715,10 @@ export default function CreateJobCard() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {(formData[activeParts.parentKey]?.[activeParts.rowIndex].parts || []).map((p, idx) => (
+                      {(
+                        formData[activeParts.parentKey]?.[activeParts.rowIndex]
+                          .parts || []
+                      ).map((p, idx) => (
                         <TableRow key={idx}>
                           <TableCell style={{ minWidth: 200 }}>
                             <Autocomplete
@@ -635,9 +728,14 @@ export default function CreateJobCard() {
                               value={p.name || ""}
                               onInputChange={(_, newValue) => {
                                 const newPartName = newValue || "";
-                                const foundPart = savedParts.find((sp) => sp.part_name === newPartName);
-                                const updated = [...formData[activeParts.parentKey]];
-                                const currentPart = updated[activeParts.rowIndex].parts[idx];
+                                const foundPart = savedParts.find(
+                                  (sp) => sp.part_name === newPartName
+                                );
+                                const updated = [
+                                  ...formData[activeParts.parentKey],
+                                ];
+                                const currentPart =
+                                  updated[activeParts.rowIndex].parts[idx];
                                 currentPart.name = newPartName;
                                 if (foundPart) {
                                   currentPart.price = foundPart.part_price;
@@ -647,7 +745,13 @@ export default function CreateJobCard() {
                                   [activeParts.parentKey]: updated,
                                 }));
                               }}
-                              renderInput={(params) => <TextField {...params} size="small" label="Part Name" />}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  size="small"
+                                  label="Part Name"
+                                />
+                              )}
                             />
                           </TableCell>
                           <TableCell style={{ minWidth: 80 }}>
@@ -656,7 +760,9 @@ export default function CreateJobCard() {
                               value={p.qty ?? ""}
                               disabled={isPlanExpired}
                               onChange={(e) => {
-                                const updated = [...formData[activeParts.parentKey]];
+                                const updated = [
+                                  ...formData[activeParts.parentKey],
+                                ];
                                 updated[activeParts.rowIndex].parts[idx] = {
                                   ...p,
                                   qty: e.target.value,
@@ -675,7 +781,9 @@ export default function CreateJobCard() {
                               value={p.price ?? ""}
                               disabled={isPlanExpired}
                               onChange={(e) => {
-                                const updated = [...formData[activeParts.parentKey]];
+                                const updated = [
+                                  ...formData[activeParts.parentKey],
+                                ];
                                 updated[activeParts.rowIndex].parts[idx] = {
                                   ...p,
                                   price: e.target.value,
@@ -693,8 +801,12 @@ export default function CreateJobCard() {
                               color="error"
                               disabled={isPlanExpired}
                               onClick={() => {
-                                const updated = [...formData[activeParts.parentKey]];
-                                updated[activeParts.rowIndex].parts = updated[activeParts.rowIndex].parts.filter((_, i) => i !== idx);
+                                const updated = [
+                                  ...formData[activeParts.parentKey],
+                                ];
+                                updated[activeParts.rowIndex].parts = updated[
+                                  activeParts.rowIndex
+                                ].parts.filter((_, i) => i !== idx);
                                 setFormData((prev) => ({
                                   ...prev,
                                   [activeParts.parentKey]: updated,
@@ -709,13 +821,19 @@ export default function CreateJobCard() {
                     </TableBody>
                   </Table>
                 </div>
-                {partsErrors && <span className="error-text">{partsErrors}</span>}
+                {partsErrors && (
+                  <span className="error-text">{partsErrors}</span>
+                )}
                 <Button
                   startIcon={<AddCircle />}
                   onClick={() => {
                     const updated = [...formData[activeParts.parentKey]];
-                    const currentParts = updated[activeParts.rowIndex].parts || [];
-                    updated[activeParts.rowIndex].parts = [...currentParts, { name: "", qty: 1, price: 0 }];
+                    const currentParts =
+                      updated[activeParts.rowIndex].parts || [];
+                    updated[activeParts.rowIndex].parts = [
+                      ...currentParts,
+                      { name: "", qty: 1, price: 0 },
+                    ];
                     setFormData((prev) => ({
                       ...prev,
                       [activeParts.parentKey]: updated,
@@ -737,7 +855,11 @@ export default function CreateJobCard() {
         </Modal>
 
         {/* Confirm dialog (replaces window.confirm usage) */}
-        <ConfirmDialog open={confirmState.open} message={confirmState.message} onClose={handleCloseConfirm} />
+        <ConfirmDialog
+          open={confirmState.open}
+          message={confirmState.message}
+          onClose={handleCloseConfirm}
+        />
       </div>
     </>
   );
