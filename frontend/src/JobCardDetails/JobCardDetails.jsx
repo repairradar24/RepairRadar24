@@ -484,7 +484,7 @@ export default function JobCardDetails() {
                         <TableRow
                           key={rowIndex}
                           style={{
-                            backgroundColor: rowColor ? rowColor + "20" : "transparent",
+                            backgroundColor: rowColor ? rowColor + "60" : "transparent",
                           }}
                         >
                           {field.fields
