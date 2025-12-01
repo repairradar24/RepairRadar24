@@ -5,41 +5,51 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+// You still keep this for local development
+const PORT = process.env.PORT || 8000;
 
 app.use(cors({
-  origin: '*', // Allow all origins
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Middleware to parse JSON
 app.use(express.json());
 
-app.use('/api', authRoutes); // ✅ Mount the signup route
-app.use('/user', userRoutes); // protected user routes
+// Middleware to ensure DB is connected before handling routes
+// This is necessary for Serverless environments (Cold Starts)
+app.use(async (req, res, next) => {
+  try {
+    // Assuming connectMainDb checks if connection is already open
+    // so it doesn't reconnect on every request if the container is warm
+    await connectMainDb();
+    next();
+  } catch (error) {
+    console.error("DB Connection failed", error);
+    res.status(500).json({ error: "Database connection error" });
+  }
+});
 
-// Sample API route
+app.use('/api', authRoutes);
+app.use('/user', userRoutes);
+
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend connected successfully!' });
 });
 
-const dropData = async () => {
-  const db = getMainDb();
-  await db.collection('users').insertOne({ "name": "Test User", "email": "hetvikshah2001@gamil.com", "password": "test123" });
-  console.log("Data inserted successfully");
+// --- THIS IS THE IMPORTANT PART ---
+
+// Only listen if the file is run directly (Localhost)
+if (require.main === module) {
+  (async () => {
+    try {
+      await connectMainDb();
+      app.listen(PORT, () => console.log(`🚀 Server running locally on http://localhost:${PORT}`));
+    } catch (err) {
+      console.error('❌ Failed to connect to main DB locally', err);
+    }
+  })();
 }
 
-(async () => {
-  try {
-    console.log("Acquring db connection");
-    await connectMainDb();
-    console.log("Main database connection established");
-    app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
-    // dropData();
-  } catch (err) {
-    console.error('❌ Failed to connect to main DB', err);
-    process.exit(1);
-  }
-})();
-
+// Export the app for Vercel
+module.exports = app;
