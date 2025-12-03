@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getMainDb } = require('../config/mainDb');
-const { connectUserDb } = require('../config/userDb');
+const { getDb } = require('../config/db');
+const authenticateAndAttachDb = require('../middleware/authMiddleware.js');
+
 const { ObjectId } = require("mongodb");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -9,18 +10,12 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const DEFAULT_USER_DB_URL = process.env.DEFAULT_USER_DB_URL;
 
 if (!JWT_SECRET) {
   console.error("FATAL ERROR: JWT_SECRET is not defined in .env file");
-  process.exit(1); // Stop the server if the secret is missing
-}
-if (!DEFAULT_USER_DB_URL) {
-  console.error("FATAL ERROR: DEFAULT_USER_DB_URL is not defined in .env file");
-  process.exit(1); // Stop the server if the secret is missing
+  process.exit(1);
 }
 
-// POST /api/signup
 router.post('/signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -28,24 +23,21 @@ router.post('/signup', async (req, res) => {
     if (!name || !email || !password)
       return res.status(400).json({ error: 'All fields are required.' });
 
-    const db = await getMainDb();
+    const db = getDb();
 
-    // Check if email already exists
     const existingUser = await db.collection('users').findOne({ email });
     if (existingUser)
       return res.status(409).json({ error: 'Email already registered.' });
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user
     const result = await db.collection('users').insertOne({
       name,
       email,
       password: hashedPassword,
-      validity: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days free validity in milliseconds
-      dbUrl: DEFAULT_USER_DB_URL,
-      schemaConfigured: true
+      validity: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days free
+      schemaConfigured: true,
+      createdAt: new Date()
     });
 
     res.status(201).json({
@@ -65,7 +57,7 @@ router.post('/signin', async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ error: 'Email and password are required.' });
 
-    const db = await getMainDb();
+    const db = getDb();
     const user = await db.collection('users').findOne({ email });
 
     if (!user)
@@ -76,11 +68,6 @@ router.post('/signin', async (req, res) => {
     if (!isMatch)
       return res.status(401).json({ error: 'Invalid password.' });
 
-    if (user.dbUrl === "") {
-      res.status(204).json({ error: 'No database URL found for this user.' });
-      return;
-    }
-
     let isPlanExpired = false;
     let validityDate = new Date();
 
@@ -88,14 +75,10 @@ router.post('/signin', async (req, res) => {
       console.warn(`User ${user.email} has no 'validityEndDate'. Treating as active.`);
     } else {
       validityDate = new Date(user.validity);
-
       validityDate.setHours(23, 59, 59, 999);
-
       isPlanExpired = new Date() > validityDate;
     }
 
-
-    // Generate JWT token
     const token = jwt.sign(
       {
         userId: user._id,
@@ -103,10 +86,8 @@ router.post('/signin', async (req, res) => {
         isExpired: isPlanExpired
       },
       JWT_SECRET,
-      { expiresIn: '6h' } // Token valid for 6 hours
+      { expiresIn: '6h' }
     );
-
-    connectUserDb(user.dbUrl, token)
 
     res.status(200).json({
       message: 'Signin successful',
@@ -123,62 +104,29 @@ router.post('/signin', async (req, res) => {
   }
 });
 
-const extractHeaderToken = (req) => {
-  const authHeader = req.headers["authorization"];
-  if (!authHeader) {
-    console.log("No auth header");
-    return res.status(401).json({ success: false, message: "No token provided" });
-  }
-
-  const token = authHeader.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ success: false, message: "Invalid token format" });
-  }
-
-  // 2️⃣ Verify token
-  let decoded;
+router.put("/update-name", authenticateAndAttachDb, async (req, res) => {
   try {
-    decoded = jwt.verify(token, JWT_SECRET);
-    return decoded;
-  } catch (err) {
-    return res.status(401).json({ success: false, message: "Invalid or expired token" });
-  }
-}
-
-router.put("/update-name", async (req, res) => {
-  try {
-    const decoded = extractHeaderToken(req);
-
-    const userId = decoded.userId; // signed at login
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "Invalid token payload" });
-    }
-
-    // 3️⃣ Validate input
     const { name } = req.body;
+    const userId = req.user.userId;
+
     if (!name || name.trim() === "") {
       return res.status(400).json({ success: false, message: "Name is required" });
     }
 
-    // 4️⃣ Connect to main DB
-    const db = await getMainDb();
-
-    // 5️⃣ Update user
-    const result = await db.collection("users").findOneAndUpdate(
+    const result = await req.db.collection("users").findOneAndUpdate(
       { _id: new ObjectId(userId) },
       { $set: { name } },
       { returnDocument: "after" }
     );
 
-    if (!result) {
+    if (!result || !result.value) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // 6️⃣ Respond
     return res.status(200).json({
       success: true,
       message: "Business name updated successfully",
-      name: result.name
+      name: result.value.name
     });
   } catch (err) {
     console.error("Error updating name:", err);
@@ -186,15 +134,14 @@ router.put("/update-name", async (req, res) => {
   }
 });
 
-router.post("/verify-password", async (req, res) => {
+router.post("/verify-password", authenticateAndAttachDb, async (req, res) => {
   try {
-
-    const decoded = extractHeaderToken(req);
-
     const { currentPassword } = req.body;
-    const userId = decoded.userId; // assuming you have auth middleware
-    const db = await getMainDb();
-    const user = await db.collection("users").findOne({ _id: new ObjectId(userId) });
+    const userId = req.user.userId;
+
+    const user = await req.db.collection("users").findOne({ _id: new ObjectId(userId) });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const match = await bcrypt.compare(currentPassword, user.password);
     if (match) {
@@ -208,17 +155,14 @@ router.post("/verify-password", async (req, res) => {
   }
 });
 
-// Update password
-router.put("/update-password", async (req, res) => {
+router.put("/update-password", authenticateAndAttachDb, async (req, res) => {
   try {
-
-    const decoded = extractHeaderToken(req);
     const { password } = req.body;
-    const userId = decoded.userId;
-    const db = await getMainDb();
+    const userId = req.user.userId;
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.collection("users").updateOne(
+
+    await req.db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
       { $set: { password: hashedPassword } }
     );
