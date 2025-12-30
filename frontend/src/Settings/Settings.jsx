@@ -226,6 +226,7 @@ const defaultConfig = [
         fields: [
             { name: "Item Name", key: "item_name", type: "text", mandatory: true, options: [], fields: [] },
             { name: "Item Qty", key: "item_qty", type: "number", mandatory: true, options: [], fields: [] },
+            { name: "Unique Id", key: "item_unique_id", type: "text", mandatory: true, options: [], fields: [] },
             {
                 name: "Item Status",
                 key: "item_status",
@@ -639,7 +640,7 @@ const Settings = () => {
 
     const getRelevantFields = (schema) => {
         if (!schema?.schema) return [];
-        const usefulKeys = ["job_no", "customer_name", "customer_phone", "item_name", "item_qty", "item_serial"];
+        const usefulKeys = ["job_no", "customer_name", "customer_phone", "item_name", "item_qty", "item_unique_id"];
         const fields = [];
         schema.schema.forEach((field) => {
             if (usefulKeys.includes(field.key)) {

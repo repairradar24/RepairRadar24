@@ -57,6 +57,15 @@ const retryWithTimeout = async (fn, timeoutMs = 5000, intervalMs = 300) => {
   }
 };
 
+const formatDate = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+  const year = String(date.getFullYear()).slice(-2); // Get last 2 digits of year
+  return `${day}-${month}-${year}`;
+};
+
 export default function Dashboard() {
   const [jobs, setJobs] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,9 +79,9 @@ export default function Dashboard() {
   const [statusOptions, setStatusOptions] = useState([]);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
-  
+
   // STATE FOR ITEM STATUS COLORS
-  const [itemStatusOptions, setItemStatusOptions] = useState([]); 
+  const [itemStatusOptions, setItemStatusOptions] = useState([]);
 
   const [token, setToken] = useState(null);
 
@@ -104,12 +113,12 @@ export default function Dashboard() {
             api.get("/user/get-config", {
               headers: { authorization: `Bearer ${token}` },
             }),
-          5000 
+          5000
         );
 
         if (res.status === 200 && res.data && res.data.schema) {
           const schema = res.data.schema;
-          
+
           // --- Extract Job Card Status (Top Level) ---
           const statusField = schema.find((field) => field.key === "jobcard_status");
 
@@ -121,13 +130,13 @@ export default function Dashboard() {
 
             setSelectedStatuses(defaults);
           }
-          
+
           // --- Extract Item Status Options (Nested) ---
           const itemSchema = schema.find((field) => field.key === "items");
           if (itemSchema?.fields) {
             const itemStatusField = itemSchema.fields.find((field) => field.key === "item_status");
             if (itemStatusField?.options) {
-                setItemStatusOptions(itemStatusField.options);
+              setItemStatusOptions(itemStatusField.options);
             }
           }
           // -----------------------------------------------------------
@@ -146,7 +155,7 @@ export default function Dashboard() {
 
   // 2. Fetch Jobs (Data)
   useEffect(() => {
-    if (!token) return; 
+    if (!token) return;
 
     const fetchInitialData = async () => {
       try {
@@ -155,7 +164,7 @@ export default function Dashboard() {
             api.get("/user/jobs/count", {
               headers: { authorization: `Bearer ${token}` },
             }),
-          5000 
+          5000
         );
 
         if (countRes.data?.total !== undefined) {
@@ -182,10 +191,10 @@ export default function Dashboard() {
       const res = await retryWithTimeout(
         () =>
           api.get(
-            `/user/jobs/getjobcards?offset=${pageNum * 2000000000}&limit=2000000000`, 
+            `/user/jobs/getjobcards?offset=${pageNum * 2000000000}&limit=2000000000`,
             { headers: { authorization: `Bearer ${currentToken}` } }
           ),
-        5000 
+        5000
       );
 
       if (res.data && res.data.jobs) {
@@ -281,70 +290,70 @@ export default function Dashboard() {
       <div
         className="status-filter-section"
         // Flex container to separate Job Filters (Left) and Item Legend (Right)
-        style={{ 
-            padding: "0 20px", 
-            marginBottom: "15px", 
-            display: "flex", 
-            justifyContent: "space-between", 
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "20px"
+        style={{
+          padding: "0 20px",
+          marginBottom: "15px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "20px"
         }}
       >
         {/* LEFT: Job Card Status Checkboxes */}
         <div className="job-filters">
-            {!isConfigLoaded ? (
+          {!isConfigLoaded ? (
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <CircularProgress size={20} /> <small>Loading filters...</small>
+              <CircularProgress size={20} /> <small>Loading filters...</small>
             </div>
-            ) : (
+          ) : (
             <FormGroup row>
-                {statusOptions.map((option) => (
+              {statusOptions.map((option) => (
                 <FormControlLabel
-                    key={option.value}
-                    control={
+                  key={option.value}
+                  control={
                     <Checkbox
-                        checked={selectedStatuses.includes(option.value)}
-                        onChange={() => handleStatusChange(option.value)}
-                        sx={{
+                      checked={selectedStatuses.includes(option.value)}
+                      onChange={() => handleStatusChange(option.value)}
+                      sx={{
                         color: option.color || "#1976d2",
                         "&.Mui-checked": {
-                            color: option.color || "#1976d2",
+                          color: option.color || "#1976d2",
                         },
-                        }}
+                      }}
                     />
-                    }
-                    label={option.value}
+                  }
+                  label={option.value}
                 />
-                ))}
+              ))}
             </FormGroup>
-            )}
+          )}
         </div>
 
         {/* RIGHT: Item Status Legend */}
         {itemStatusOptions.length > 0 && (
-            <div className="item-status-legend" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-                <span style={{ fontWeight: "bold", fontSize: "0.9rem", color: "#555" }}>
-                    Item Status:
+          <div className="item-status-legend" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+            <span style={{ fontWeight: "bold", fontSize: "0.9rem", color: "#555" }}>
+              Item Status:
+            </span>
+            {itemStatusOptions.map((opt) => (
+              <div key={opt.value} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <span
+                  style={{
+                    display: "block",
+                    width: "12px",
+                    height: "12px",
+                    borderRadius: "50%",
+                    backgroundColor: opt.color || "#ccc",
+                    border: "1px solid #ddd" // Slight border for visibility
+                  }}
+                ></span>
+                <span style={{ fontSize: "0.85rem", color: "#333" }}>
+                  {opt.value}
                 </span>
-                {itemStatusOptions.map((opt) => (
-                    <div key={opt.value} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                        <span 
-                            style={{
-                                display: "block",
-                                width: "12px",
-                                height: "12px",
-                                borderRadius: "50%",
-                                backgroundColor: opt.color || "#ccc",
-                                border: "1px solid #ddd" // Slight border for visibility
-                            }}
-                        ></span>
-                        <span style={{ fontSize: "0.85rem", color: "#333" }}>
-                            {opt.value}
-                        </span>
-                    </div>
-                ))}
-            </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
@@ -369,19 +378,19 @@ export default function Dashboard() {
                     alignItems: "center",
                   }}
                 >
-                  <h3>Job #{job.job_no || "-"}</h3>
-                  <span
-                    className="badge"
-                    style={{
-                      backgroundColor: statusColor,
-                      color: "white",
-                      padding: "4px 8px",
-                      borderRadius: "4px",
-                      fontSize: "0.8rem",
-                    }}
-                  >
-                    {job.jobcard_status}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                    <h5 style={{ margin: 0 }}>Job #{job.job_no || "-"}</h5>
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "#888",
+                        fontWeight: "400"
+                      }}
+                    >
+                      {/* Assuming the field name is 'createdAt' based on your description */}
+                      • {formatDate(job.createdAt)}
+                    </span>
+                  </div>
                 </div>
 
                 <p>
@@ -400,28 +409,29 @@ export default function Dashboard() {
                   <tbody>
                     {job.items && job.items.length > 0 ? (
                       job.items.map((item, idx) => {
-                          const itemStatusConfig = itemStatusOptions.find(
-                              (opt) => opt.value === item.item_status
-                          );
-                          const itemStatusColor = itemStatusConfig?.color || 'transparent'; 
-                          
-                          // Use FF opacity for solid row background
-                          const rowBackgroundColor = itemStatusColor !== 'transparent' ? itemStatusColor + 'FF' : 'transparent'; 
-                          
-                          // Contrast text logic - User requested black text always
-                          const rowTextColor = 'black';
+                        const itemStatusConfig = itemStatusOptions.find(
+                          (opt) => opt.value === item.item_status
+                        );
+                        const itemStatusColor = itemStatusConfig?.color || 'transparent';
 
-                          return (
-                            <tr key={idx} style={{ backgroundColor: rowBackgroundColor, color: rowTextColor }}>
-                              <td>
-                                  <span>
-                                      {item.item_qty > 1
-                                          ? `${item.item_name} (${item.item_qty})`
-                                          : item.item_name}
-                                  </span>
-                              </td>
-                            </tr>
-                          );
+                        // Use FF opacity for solid row background
+                        const rowBackgroundColor = itemStatusColor !== 'transparent' ? itemStatusColor + 'FF' : 'transparent';
+
+                        // Contrast text logic - User requested black text always
+                        const rowTextColor = 'black';
+
+                        return (
+                          <tr key={idx} style={{ backgroundColor: rowBackgroundColor, color: rowTextColor }}>
+                            <td>
+                              <span>
+                                {item.item_qty > 1
+                                  ? `${item.item_name} (${item.item_qty})`
+                                  : item.item_name}
+                              </span><br />
+                              {item.item_unique_id.length > 0 ? <>({item.item_unique_id})</> : null}
+                            </td>
+                          </tr>
+                        );
                       })
                     ) : (
                       <tr>

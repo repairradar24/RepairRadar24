@@ -31,6 +31,7 @@ const defaultConfig = [
         fields: [
             { name: "Item Name", key: "item_name", type: "text", mandatory: true, options: [], fields: [] },
             { name: "Item Qty", key: "item_qty", type: "number", mandatory: true, options: [], fields: [] },
+            { name: "Unique Id", key: "item_unique_id", type: "text", mandatory: true, options: [], fields: [] },
             {
                 name: "Item Status",
                 key: "item_status",
