@@ -121,6 +121,7 @@ export default function Dashboard() {
       // No token in session? Clear any lingering cache to be safe
       localStorage.removeItem(CACHE_KEY_JOBS);
       localStorage.removeItem(CACHE_KEY_CONFIG);
+      localStorage.clear();
       alert("You are not logged in. Please sign in.");
       navigate("/");
       return;

@@ -304,6 +304,7 @@ const Settings = () => {
         const token = sessionStorage.getItem("token");
         if (!token) {
             toast.error("Please log in first.");
+            localStorage.clear();
             navigate("/");
             return;
         }
@@ -375,6 +376,7 @@ const Settings = () => {
             console.error("Error fetching customers:", err);
             if (err.response?.status === 401) {
                 toast.error("Session expired. Please log in again.");
+                localStorage.clear();
                 navigate("/");
             } else {
                 toast.error("Failed to fetch customers.");
@@ -433,6 +435,7 @@ const Settings = () => {
         } catch (err) {
             if (err.response && err.response.status === 401) {
                 toast.error("Unauthorized. Please log in again.");
+                localStorage.clear();
                 navigate("/");
             } else {
                 console.error("Error fetching configuration:", err);
@@ -458,6 +461,7 @@ const Settings = () => {
             .catch((err) => {
                 if (err.status === 401) {
                     toast.error("Unauthorized. Please log in again.");
+                    localStorage.clear();
                     navigate("/");
                 } else {
                     console.error("Error saving configuration:", err);
@@ -565,6 +569,7 @@ const Settings = () => {
             console.error("Error saving part:", err);
             if (err.response?.status === 401) {
                 toast.error("Session expired. Please log in again.");
+                localStorage.clear();
                 navigate("/");
                 return;
             }
@@ -631,6 +636,7 @@ const Settings = () => {
         } catch (err) {
             if (err.response?.status === 401) {
                 toast.error("Session expired. Please log in again.");
+                localStorage.clear();
                 navigate("/");
             }
             console.error("Error fetching schema:", err);
@@ -663,7 +669,10 @@ const Settings = () => {
             return;
         }
         const token = sessionStorage.getItem("token");
-        if (!token) return navigate("/");
+        if (!token) {
+            localStorage.clear();
+            return navigate("/");
+        }
         try {
             const payload = {
                 name: messageName.trim(),
@@ -721,7 +730,10 @@ const Settings = () => {
         e.preventDefault();
         try {
             const token = sessionStorage.getItem("token");
-            if (!token) navigate("/");
+            if (!token) {
+                localStorage.clear();
+                navigate("/");
+            }
             const resp = await api.put(
                 "/api/update-name",
                 { name },
@@ -744,7 +756,10 @@ const Settings = () => {
         e.preventDefault();
         try {
             const token = sessionStorage.getItem("token");
-            if (!token) navigate("/");
+            if (!token) {
+                localStorage.clear();
+                navigate("/");
+            }
             const resp = await api.post(
                 "/api/verify-password",
                 { currentPassword },
@@ -770,7 +785,10 @@ const Settings = () => {
         }
         try {
             const token = sessionStorage.getItem("token");
-            if (!token) navigate("/");
+            if (!token) {
+                localStorage.clear();
+                navigate("/");
+            }
             const resp = await api.put(
                 "/api/update-password",
                 { password },

@@ -15,6 +15,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     sessionStorage.clear(); // Use clear() for a full logout
+    localStorage.clear();
     navigate("/");
   };
 

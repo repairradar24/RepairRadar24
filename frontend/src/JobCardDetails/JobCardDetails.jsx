@@ -69,6 +69,7 @@ export default function JobCardDetails() {
     const token = sessionStorage.getItem("token");
     if (!token) {
       toast.error("Please log in first.");
+      localStorage.clear();
       navigate("/");
       return;
     }
