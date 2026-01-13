@@ -236,9 +236,13 @@ export default function CreateJobCard() {
 
   const calculateRepairCost = (parts = []) => {
     return parts.reduce((sum, p) => {
-      const qty = parseFloat(p.qty) || 0;
-      const price = parseFloat(p.price) || 0;
-      return sum + qty * price;
+      // 1. Get Quantity (Default to 0 if missing)
+      const qty = p.part_qty ? parseFloat(p.part_qty) : 0;
+
+      // 2. Get Price
+      const price = p.part_price ? parseFloat(p.part_price) : 0;
+
+      return sum + (qty * price);
     }, 0);
   };
 
@@ -319,7 +323,7 @@ export default function CreateJobCard() {
 
     setFormData((prev) => {
       let updated = { ...prev, customer_name: upperValue };
-      
+
       if (found && !prev.customer_phone) {
         updated.customer_phone = found.customer_phone;
       }
@@ -412,21 +416,22 @@ export default function CreateJobCard() {
 
     let hasError = false;
     updated[rowIndex].parts = (updated[rowIndex].parts || []).map((part) => {
-      // Validate part name if it exists in schema as 'name'
-      if (part.name !== undefined && (!part.name || part.name.trim() === "")) {
+      // VALIDATION: Check strict mandatory field: part_name
+      if (part.part_name === undefined || !part.part_name?.trim()) {
         hasError = true;
       }
       return {
         ...part,
-        // sanitize numbers
-        qty:
-          part.qty === "" || part.qty === undefined || part.qty === null
+        // NORMALIZATION: Force part_qty to Number
+        part_qty:
+          part.part_qty === "" || part.part_qty === undefined || part.part_qty === null
             ? 1
-            : Number(part.qty),
-        price:
-          part.price === "" || part.price === undefined || part.price === null
+            : Number(part.part_qty),
+        // NORMALIZATION: Force part_price to Number
+        part_price:
+          part.part_price === "" || part.part_price === undefined || part.part_price === null
             ? 0
-            : Number(part.price),
+            : Number(part.part_price),
       };
     });
 
@@ -561,7 +566,7 @@ export default function CreateJobCard() {
             <Paper key={field.key} className="form-section">
               {errors.items && <span className="error-text">{errors.items}</span>}
               <Box sx={{ overflowX: "auto" }}>
-                <Table sx={{ minWidth: 800 }}> 
+                <Table sx={{ minWidth: 800 }}>
                   <TableHead>
                     <TableRow>
                       {field.fields

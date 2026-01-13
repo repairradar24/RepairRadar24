@@ -141,11 +141,19 @@ export default function JobCardDetails() {
   };
 
   const calculateRepairCost = (parts = []) =>
-    parts.reduce((sum, p) => sum + (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0), 0);
+    parts.reduce((sum, p) => {
+      // 1. Get Quantity (Default to 0 if missing, though handlePartsDone ensures it's 1)
+      const qty = p.part_qty ? parseFloat(p.part_qty) : 0;
+
+      // 2. Get Price
+      const price = p.part_price ? parseFloat(p.part_price) : 0;
+
+      return sum + (qty * price);
+    }, 0);
 
   const renderSimpleField = (field, value, onChange, isTable = false) => {
     const isJobNo = field.key === "job_no";
-    const marginType = isTable ? "none" : "normal"; 
+    const marginType = isTable ? "none" : "normal";
 
     switch (field.type) {
       case "text":
@@ -158,7 +166,7 @@ export default function JobCardDetails() {
             value={value || ""}
             onChange={(e) => onChange(e.target.value)}
             fullWidth
-            margin={marginType} 
+            margin={marginType}
             size="small"
             error={!!errors[field.key]}
             helperText={errors[field.key]}
@@ -254,20 +262,27 @@ export default function JobCardDetails() {
     const updated = [...formData[activeParts.parentKey]];
     const rowParts = updated[activeParts.rowIndex].parts || [];
 
+    // --- VALIDATION: Check part_name ---
     for (let p of rowParts) {
-      if (p.name !== undefined && !p.name?.trim()) {
+      // Check strict mandatory field: part_name
+      if (p.part_name === undefined || !p.part_name?.trim()) {
         setPartsErrors("Part name cannot be empty.");
         toast.warn("Part name cannot be empty.");
         return;
       }
     }
 
+    // --- NORMALIZATION: Format numbers ---
     updated[activeParts.rowIndex].parts = rowParts.map((p) => ({
       ...p,
-      qty: p.qty === "" || p.qty == null ? 1 : Number(p.qty),
-      price: p.price === "" || p.price == null ? 0 : Number(p.price),
+      // If part_qty is empty/null, default to 1, otherwise ensure it's a Number
+      part_qty: p.part_qty === "" || p.part_qty == null ? 1 : Number(p.part_qty),
+
+      // If part_price is empty/null, default to 0, otherwise ensure it's a Number
+      part_price: p.part_price === "" || p.part_price == null ? 0 : Number(p.part_price),
     }));
 
+    // Update State
     setFormData((prev) => ({
       ...prev,
       [activeParts.parentKey]: updated,
@@ -399,7 +414,7 @@ export default function JobCardDetails() {
             <div key={field.key} className="list-wrapper">
               <h4>{field.name}</h4>
               <Paper className="list-table" sx={{ overflowX: "auto" }}>
-                <Table sx={{ minWidth: 800 }}> 
+                <Table sx={{ minWidth: 800 }}>
                   <TableHead>
                     <TableRow>
                       {field.fields
@@ -409,15 +424,15 @@ export default function JobCardDetails() {
                           let style = { whiteSpace: "nowrap" };
 
                           if (lowerKey.includes("qty")) {
-                            style.width = "120px"; 
+                            style.width = "120px";
                           } else if (lowerKey.includes("price") || lowerKey.includes("cost")) {
                             style.width = "100px";
                           } else if (sub.key === "item_name") {
-                            style.minWidth = "250px"; 
+                            style.minWidth = "250px";
                           } else if (sub.type === "dropdown" || sub.key === "item_status" || sub.key === "unique_id") {
-                            style.minWidth = "200px"; 
+                            style.minWidth = "200px";
                           } else {
-                            style.minWidth = "120px"; 
+                            style.minWidth = "120px";
                           }
 
                           return (
@@ -632,11 +647,11 @@ export default function JobCardDetails() {
                           let style = { whiteSpace: "nowrap" };
 
                           if (lowerKey.includes("qty")) {
-                            style.width = "150px"; 
+                            style.width = "150px";
                           } else if (lowerKey.includes("price") || lowerKey.includes("cost")) {
                             style.width = "180px";
                           } else if (f.key === "name" || f.key === "part_name") {
-                            style.minWidth = "250px"; 
+                            style.minWidth = "250px";
                           } else {
                             // style.minWidth = "120px"; 
                           }
