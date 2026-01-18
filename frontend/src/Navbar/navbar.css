@@ -44,6 +44,7 @@
   letter-spacing: 0.5px;
   white-space: nowrap;
   cursor: pointer;
+  transition: font-size 0.3s ease;
 }
 
 .navbar-brand:hover {
@@ -79,19 +80,55 @@
   transition: background-color 0.2s ease;
   -webkit-font-smoothing: antialiased;
   white-space: nowrap;
+  gap: 6px;
 }
 
 .nav-btn:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
-.nav-btn.icon-btn {
-  padding: 8px;
-  width: 40px;
-  height: 40px;
-  box-sizing: border-box;
-}
-
 .nav-btn .MuiSvgIcon-root {
   font-size: 1.25rem;
+}
+
+/* --- MOBILE RESPONSIVENESS FIX --- */
+@media screen and (max-width: 920px) {
+  .navbar {
+    padding: 10px 15px;
+  }
+
+  .nav-section.center {
+    position: static;
+    transform: none;
+    flex: auto;
+    justify-content: center;
+  }
+
+  .navbar-brand {
+    font-size: 1.2rem;
+  }
+
+  .btn-text {
+    display: none;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .nav-separator {
+    display: none;
+  }
+
+  .nav-btn {
+    padding: 8px;
+  }
+
+  .nav-section {
+    gap: 5px;
+  }
+
+  .nav-section.left, .nav-section.right {
+    flex: 0 0 auto;
+  }
 }

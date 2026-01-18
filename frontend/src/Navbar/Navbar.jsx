@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SettingsIcon from "@mui/icons-material/Settings";
-import HomeIcon from "@mui/icons-material/Home"; // Added for the home button
+import HomeIcon from "@mui/icons-material/Home";
+import LogoutIcon from "@mui/icons-material/Logout"; // Import Logout Icon
 import "./navbar.css";
 
 export default function Navbar() {
@@ -14,7 +15,7 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = () => {
-    sessionStorage.clear(); // Use clear() for a full logout
+    sessionStorage.clear();
     localStorage.clear();
     navigate("/");
   };
@@ -27,7 +28,9 @@ export default function Navbar() {
           className="nav-btn"
           title="Home"
         >
-          Home
+          {/* Add Icon and wrap text in a span for responsive hiding */}
+          <HomeIcon className="btn-icon" />
+          <span className="btn-text">Home</span>
         </button>
       </div>
 
@@ -38,17 +41,23 @@ export default function Navbar() {
       </div>
 
       <div className="nav-section right">
+        {/* Hide username on very small mobile screens */}
         <div className="user-name">{userName || "USER"}</div>
+
         <span className="nav-separator">|</span>
-        <button onClick={handleLogout} className="nav-btn">
-          Logout
+
+        <button onClick={handleLogout} className="nav-btn" title="Logout">
+          <LogoutIcon className="btn-icon" />
+          <span className="btn-text">Logout</span>
         </button>
+
         <button
           onClick={() => navigate("/settings")}
           className="nav-btn"
           title="Settings"
         >
           <SettingsIcon />
+          {/* Settings usually doesn't need text if it has a gear icon */}
         </button>
       </div>
     </nav>
