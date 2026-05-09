@@ -67,6 +67,7 @@ export default function CreateJobCard() {
   const [schema, setSchema] = useState([]);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [activeParts, setActiveParts] = useState(null);
   const [errors, setErrors] = useState({});
@@ -346,6 +347,8 @@ export default function CreateJobCard() {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     setErrors({});
     const newErrors = {};
     const alertMessages = [];
@@ -385,6 +388,7 @@ export default function CreateJobCard() {
     if (alertMessages.length > 0) {
       setErrors(newErrors);
       toast.error(alertMessages.join("\n"), { autoClose: 7000 });
+      setIsSaving(false);
       return;
     }
 
@@ -394,8 +398,10 @@ export default function CreateJobCard() {
         headers: { authorization: `Bearer ${token}` },
       });
       toast.success("Job created successfully!");
+      setIsSaving(false);
       navigate("/dashboard");
     } catch (err) {
+      setIsSaving(false);
       if (err.response?.status === 401) {
         toast.error("Session expired. Please log in again.");
         navigate("/");
@@ -711,9 +717,9 @@ export default function CreateJobCard() {
           color="primary"
           onClick={handleSave}
           className="save-job-btn"
-          disabled={isPlanExpired}
+          disabled={isPlanExpired || isSaving}
         >
-          Save Job
+          {isSaving ? "Saving..." : "Save Job"}
         </Button>
 
         {/* --- DYNAMIC PARTS MODAL --- */}
