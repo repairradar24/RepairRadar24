@@ -258,6 +258,23 @@ export default function JobCardDetails() {
     }
   };
 
+  const handleDeleteJob = async () => {
+    const ok = await askConfirm("Are you sure you want to delete this entire job? This action cannot be undone.");
+    if (!ok) return;
+
+    try {
+      const token = sessionStorage.getItem("token");
+      await api.delete(`/user/jobs/deletejobcard/${id}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      toast.success("Job deleted successfully!");
+      navigate("/dashboard");
+    } catch (err) {
+      console.error("Job delete failed:", err);
+      toast.error("Could not delete job.");
+    }
+  };
+
   const handlePartsDone = () => {
     const updated = [...formData[activeParts.parentKey]];
     const rowParts = updated[activeParts.rowIndex].parts || [];
@@ -558,6 +575,15 @@ export default function JobCardDetails() {
             }}
           >
             WhatsApp
+          </Button>
+
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteJob}
+            className="save-btn"
+          >
+            Delete Job
           </Button>
 
           <Button

@@ -282,6 +282,29 @@ router.put("/jobs/updatejobcard/:id", authenticateAndAttachDb, async (req, res) 
   }
 });
 
+router.delete("/jobs/deletejobcard/:id", authenticateAndAttachDb, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: "Invalid Job ID" });
+    }
+
+    const result = await req.db.collection("jobs").deleteOne({
+      _id: new ObjectId(req.params.id),
+      uid: userId
+    });
+
+    if (result.deletedCount === 0)
+      return res.status(404).json({ error: "Job not found" });
+
+    res.json({ success: true, message: "Job deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting job:", err);
+    res.status(500).json({ error: "Failed to delete job" });
+  }
+});
+
 router.get("/whatsapp/get-messages", authenticateAndAttachDb, async (req, res) => {
   try {
     const userId = req.user.userId;
