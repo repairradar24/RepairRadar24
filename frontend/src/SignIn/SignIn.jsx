@@ -155,10 +155,8 @@ export default function SignIn() {
             }
         } catch (err) {
             let errorMessage = "Sign in failed.";
-            if (err.response?.status === 401) {
-                errorMessage = "Incorrect password";
-            } else if (err.response?.status === 404) {
-                errorMessage = "No user found with this email.";
+            if (err.response?.data?.error) {
+                errorMessage = err.response.data.error;
             } else if (err.response?.data?.message) {
                 errorMessage = err.response.data.message;
             }
@@ -183,7 +181,12 @@ export default function SignIn() {
                 setIsSignUp(false);
             }
         } catch (err) {
-            const errorMessage = err.response?.data?.message || "Sign up failed.";
+            let errorMessage = "Sign up failed.";
+            if (err.response?.data?.error) {
+                errorMessage = err.response.data.error;
+            } else if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
+            }
             setError(errorMessage);
             toast.error(errorMessage);
         } finally {
